@@ -1,0 +1,191 @@
+/* stylelint-disable at-rule-no-unknown */
+/** @import must precede all other statements */
+/* Preload font for better LCP */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /**
+   * Tailwind CSS theme
+   * tailwind.config.ts expects the following color variables to be expressed as HSL values.
+   * A different format will require also updating the theme in tailwind.config.ts.
+  */
+  :root {
+    /* Palette personnalisée: #14100b, #4d0013, #f1d6b0, #7c0a0a, #fef6e6, #f9d556 */
+    --background: 40 85% 96%; /* #fef6e6 - beige très clair */
+    --foreground: 30 30% 5%; /* #14100b - très sombre */
+
+    --card: 40 85% 96%; /* #fef6e6 - beige très clair */
+    --card-foreground: 30 30% 5%; /* #14100b - très sombre */
+
+    --popover: 40 85% 96%; /* #fef6e6 - beige très clair */
+    --popover-foreground: 30 30% 5%; /* #14100b - très sombre */
+
+    --primary: 20 70% 28%; /* #4d0013 - marron foncé */
+    --primary-foreground: 40 85% 96%; /* #fef6e6 - beige très clair */
+
+    --secondary: 35 65% 85%; /* #f1d6b0 - beige clair */
+    --secondary-foreground: 30 30% 5%; /* #14100b - très sombre */
+
+    --muted: 35 65% 85%; /* #f1d6b0 - beige clair */
+    --muted-foreground: 20 70% 28%; /* #4d0013 - marron foncé */
+
+    --accent: 20 70% 28%; /* #4d0013 - marron/rouge foncé */
+    --accent-foreground: 40 85% 96%; /* #fef6e6 - beige très clair */
+
+    --destructive: 0 85% 27%; /* #7c0a0a - rouge foncé */
+    --destructive-foreground: 40 85% 96%; /* #fef6e6 - beige très clair */
+
+    --border: 35 65% 75%; /* variation de #f1d6b0 pour les bordures */
+    --input: 35 65% 85%; /* #f1d6b0 - beige clair */
+    --ring: 20 70% 28%; /* #4d0013 - marron foncé */
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 40 85% 96%; /* #fef6e6 - beige très clair */
+    --sidebar-foreground: 30 30% 5%; /* #14100b - très sombre */
+    --sidebar-primary: 20 70% 28%; /* #4d0013 - marron foncé */
+    --sidebar-primary-foreground: 40 85% 96%; /* #fef6e6 - beige très clair */
+    --sidebar-accent: 35 65% 85%; /* #f1d6b0 - beige clair */
+    --sidebar-accent-foreground: 30 30% 5%; /* #14100b - très sombre */
+    --sidebar-border: 35 65% 75%; /* variation de #f1d6b0 */
+    --sidebar-ring: 20 70% 28%; /* #4d0013 - marron foncé */
+  }
+
+  .light {
+    /* Palette personnalisée: #14100b, #4d0013, #f1d6b0, #7c0a0a, #fef6e6, #f9d556 */
+    --background: 40 85% 96%; /* #fef6e6 - beige très clair */
+    --foreground: 30 30% 5%; /* #14100b - très sombre */
+
+    --card: 40 85% 96%; /* #fef6e6 - beige très clair */
+    --card-foreground: 30 30% 5%; /* #14100b - très sombre */
+
+    --popover: 40 85% 96%; /* #fef6e6 - beige très clair */
+    --popover-foreground: 30 30% 5%; /* #14100b - très sombre */
+
+    --primary: 20 70% 28%; /* #4d0013 - marron foncé */
+    --primary-foreground: 40 85% 96%; /* #fef6e6 - beige très clair */
+
+    --secondary: 35 65% 85%; /* #f1d6b0 - beige clair */
+    --secondary-foreground: 30 30% 5%; /* #14100b - très sombre */
+
+    --muted: 35 65% 85%; /* #f1d6b0 - beige clair */
+    --muted-foreground: 20 70% 28%; /* #4d0013 - marron foncé */
+
+    --accent: 20 70% 28%; /* #4d0013 - marron/rouge foncé */
+    --accent-foreground: 40 85% 96%; /* #fef6e6 - beige très clair */
+
+    --destructive: 0 85% 27%; /* #7c0a0a - rouge foncé */
+    --destructive-foreground: 40 85% 96%; /* #fef6e6 - beige très clair */
+
+    --border: 35 65% 75%; /* variation de #f1d6b0 pour les bordures */
+    --input: 35 65% 85%; /* #f1d6b0 - beige clair */
+    --ring: 20 70% 28%; /* #4d0013 - marron foncé */
+
+    --sidebar-background: 40 85% 96%; /* #fef6e6 - beige très clair */
+    --sidebar-foreground: 30 30% 5%; /* #14100b - très sombre */
+    --sidebar-primary: 20 70% 28%; /* #4d0013 - marron foncé */
+    --sidebar-primary-foreground: 40 85% 96%; /* #fef6e6 - beige très clair */
+    --sidebar-accent: 35 65% 85%; /* #f1d6b0 - beige clair */
+    --sidebar-accent-foreground: 30 30% 5%; /* #14100b - très sombre */
+    --sidebar-border: 35 65% 75%; /* variation de #f1d6b0 */
+    --sidebar-ring: 20 70% 28%; /* #4d0013 - marron foncé */
+  }
+
+  .dark {
+    /* Palette personnalisée adaptée pour le mode sombre */
+    --background: 30 30% 5%; /* #14100b - très sombre */
+    --foreground: 40 85% 96%; /* #fef6e6 - beige très clair */
+
+    --card: 30 30% 8%; /* légèrement plus clair que background */
+    --card-foreground: 40 85% 96%; /* #fef6e6 - beige très clair */
+
+    --popover: 30 30% 8%;
+    --popover-foreground: 40 85% 96%;
+
+    --primary: 20 70% 28%; /* #4d0013 - marron foncé */
+    --primary-foreground: 40 85% 96%; /* #fef6e6 - beige très clair */
+
+    --secondary: 20 70% 28%; /* #4d0013 - marron foncé */
+    --secondary-foreground: 40 85% 96%; /* #fef6e6 - beige très clair */
+
+    --muted: 20 70% 20%; /* variation plus sombre de #4d0013 */
+    --muted-foreground: 35 65% 85%; /* #f1d6b0 - beige clair */
+
+    --accent: 20 70% 28%; /* #4d0013 - marron/rouge foncé */
+    --accent-foreground: 40 85% 96%; /* #fef6e6 - beige très clair */
+
+    --destructive: 0 85% 27%; /* #7c0a0a - rouge foncé */
+    --destructive-foreground: 40 85% 96%; /* #fef6e6 - beige très clair */
+
+    --border: 20 70% 20%; /* variation de #4d0013 */
+    --input: 30 30% 10%;
+    --ring: 45 95% 66%; /* #f9d556 - jaune doré */
+
+    --sidebar-background: 30 30% 5%; /* #14100b - très sombre */
+    --sidebar-foreground: 40 85% 96%; /* #fef6e6 - beige très clair */
+    --sidebar-primary: 45 95% 66%; /* #f9d556 - jaune doré */
+    --sidebar-primary-foreground: 30 30% 5%; /* #14100b - très sombre */
+    --sidebar-accent: 20 70% 28%; /* #4d0013 - marron foncé */
+    --sidebar-accent-foreground: 40 85% 96%; /* #fef6e6 - beige très clair */
+    --sidebar-border: 20 70% 20%; /* variation de #4d0013 */
+    --sidebar-ring: 45 95% 66%; /* #f9d556 - jaune doré */
+  }
+}
+
+@layer base {
+  * {
+    /* stylelint-disable-next-line at-rule-no-unknown */
+    @apply border-border;
+  }
+
+  body {
+    /* stylelint-disable-next-line at-rule-no-unknown */
+    @apply bg-background text-foreground;
+  }
+
+  :where(p, span, li, h1, h2, h3, h4, h5, h6, a, button, label, td, th) {
+    overflow-wrap: break-word;
+    word-break: normal;
+    -webkit-hyphens: auto;
+    -moz-hyphens: auto;
+    hyphens: auto;
+  }
+  
+  /* Prevent unwanted word breaks on mobile */
+  h1, h2, h3, h4, h5, h6 {
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+  
+  /* Better text wrapping for labels and buttons */
+  label, button {
+    word-break: normal;
+    overflow-wrap: break-word;
+  }
+
+  pre,
+  code {
+    overflow-x: auto;
+    white-space: pre;
+  }
+}
+
+@layer utilities {
+  .progress-bar {
+    width: var(--progress-width, 0%);
+  }
+
+  .scrollbar-hide {
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari and Opera */
+  }
+}
