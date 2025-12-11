@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Always use an external API during development; Vite proxies /api
 export default defineConfig(() => {
@@ -10,10 +13,6 @@ export default defineConfig(() => {
     server: {
       host: "::",
       port: 8080,
-      headers: {
-        "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
-        "Cross-Origin-Embedder-Policy": "unsafe-none",
-      },
       fs: {
         allow: ["./", "./client", "./shared"],
         deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "server/**"],
