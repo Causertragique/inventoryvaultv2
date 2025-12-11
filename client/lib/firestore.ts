@@ -1,11 +1,10 @@
-import { getFirestore, Firestore } from "firebase/firestore";
-import { app } from "./firebase";
+import type { Firestore } from "firebase/firestore";
+import { db as firebaseDb } from "./firebase";
 
-let db: Firestore | null = null;
+const db: Firestore | null = firebaseDb;
 
-if (app) {
-  db = getFirestore(app);
-  console.log("Firestore initialisé");
+if (db) {
+  console.log("Firestore initialised");
 }
 
 export { db };

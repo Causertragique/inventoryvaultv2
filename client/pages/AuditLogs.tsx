@@ -6,10 +6,10 @@ import { Shield, AlertTriangle, CheckCircle, User, Clock, Package, TrendingUp, T
 import { getRecentInventoryLogs, generateAuditReport } from "@/lib/audit";
 import { getUserPermissions, getCurrentUserRole, ROLE_LABELS } from "@/lib/permissions";
 import { FirestoreInventoryLog } from "@shared/firestore-schema";
-import { useI18n } from "@/contexts/I18nContext";
+import { usei18n } from "@/contexts/i18nContext";
 
 export default function AuditLogs() {
-  const { t, language } = useI18n();
+  const { t, language } = usei18n();
   const [logs, setLogs] = useState<FirestoreInventoryLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [report, setReport] = useState<any>(null);
@@ -187,7 +187,7 @@ export default function AuditLogs() {
                 <CardTitle className="text-sm font-medium">{t.auditLogs.activeUsers}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{Object.keys(report.byUser).length}</p>
+                <p className="text-2xl font-bold">{report.byUser && typeof report.byUser === 'object' ? Object.keys(report.byUser).length : 0}</p>
               </CardContent>
             </Card>
           </div>

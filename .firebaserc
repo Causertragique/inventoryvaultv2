@@ -1,5 +1,22 @@
 {
   "projects": {
-    "default": "inventoryvaultv2"
-  }
+    "default": "inventoryvault"
+  },
+  "targets": {
+    "inventoryvault": {
+      "hosting": {
+        "app": [
+          "inventoryvault"
+        ]
+      }
+    },
+    "inventorybar": {
+      "hosting": {
+        "app": [
+          "inventorybar"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

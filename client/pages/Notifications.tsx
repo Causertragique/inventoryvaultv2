@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { useAuth } from "@/hooks/useAuth";
-import { useI18n } from "@/contexts/I18nContext";
+import { usei18n } from "@/contexts/i18nContext";
 import {
   Dialog,
   DialogContent,
@@ -53,7 +53,7 @@ interface Notification {
 }
 
 export default function Notifications() {
-  const { t } = useI18n();
+  const { t } = usei18n();
   const { user } = useAuth();
   const location = useLocation();
 
@@ -391,6 +391,9 @@ export default function Notifications() {
                           <button
                             onClick={() => handleCompleteReminder(reminder.id)}
                             className="flex-shrink-0"
+                            type="button"
+                            title="Mark as completed"
+                            aria-label="Mark as completed"
                           >
                             <CheckCircle
                               className={`h-5 w-5 cursor-pointer transition-colors ${

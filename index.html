@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>La Réserve - Gestion de bar professionnelle</title>
+    
+    <!-- Apple Meta Tags for App Store -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="La Réserve" />
+    <meta name="description" content="Application de gestion de bar professionnelle avec inventaire, point de vente et analytics" />
+    <meta name="keywords" content="bar, gestion, inventaire, point de vente, restaurant, cocktail" />
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon-120x120.png" />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Theme Color - Required for PWA on Chrome/Safari/Edge/Firefox -->
+    <meta name="theme-color" content="#000000" />
+    <meta name="msapplication-TileColor" content="#000000" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="#000000" />
+    <!-- Balise spécifique pour Firefox -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#000000" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
+    
+    <!-- Preconnect to external domains -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="/tonneau.webp" as="image" type="image/webp" />
+    <link rel="preload" href="/Logoaccueil.webp" as="image" type="image/webp" />
+  </head>
+
+  <body>
+    <div id="root"></div>
+
+    <script type="module" src="/client/main.tsx"></script>
+  </body>
+</html>

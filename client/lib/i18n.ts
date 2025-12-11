@@ -3,7 +3,7 @@ export type Language = "en" | "fr" | "es" | "de";
 
 export interface Translations {
   // Layout & Navigation
-  layout: {
+  Layout: {
     appName: string;
     appSubtitle: string;
     nav: {
@@ -17,6 +17,13 @@ export interface Translations {
 
   // Inventory page
   inventory: {
+    other: string;
+    juice: string;
+    soda: string;
+    beer: string;
+    spirits: string;
+    wine: string;
+    allCategories: string;
     title: string;
     subtitle: string;
     addProduct: string;
@@ -67,6 +74,9 @@ export interface Translations {
         save: string;
         cancel: string;
       categories: {
+        other: string;
+        soda: string;
+        juice: string;
         spirits: string;
         beer: string;
         wine: string;
@@ -123,6 +133,8 @@ export interface Translations {
 
   // Sales page
     sales: {
+      noSalesPermission: string;
+      accessDenied: string;
       title: string;
       subtitle: string;
       orderSummary: string;
@@ -439,7 +451,7 @@ export interface Translations {
 
 const translations: Record<Language, Translations> = {
   en: {
-    layout: {
+    Layout: {
       appName: "Reserve Vault",
       appSubtitle: "Inventory & POS System",
       nav: {
@@ -508,6 +520,9 @@ const translations: Record<Language, Translations> = {
           champagne: "Champagne & Sparkling",
           readyToDrink: "Ready to Drink",
           snacks: "Snacks",
+          juice: "Juice",
+          soda: "Soda",
+          other: "Other",
         },
         subcategories: {
           redWine: "Red Wine",
@@ -537,6 +552,13 @@ const translations: Record<Language, Translations> = {
           uk: "United Kingdom",
         },
       },
+      other: "",
+      juice: "",
+      soda: "",
+      beer: "",
+      spirits: "",
+      wine: "",
+      allCategories: ""
     },
     productCard: {
       stockLevel: "Stock Level",
@@ -598,6 +620,8 @@ const translations: Record<Language, Translations> = {
         cashPayment: "Cash payment received! Total: $",
         orderCompleted: "Order completed! Total: $",
       },
+      accessDenied: "",
+      noSalesPermission: ""
     },
     analytics: {
       title: "Analytics",
@@ -851,7 +875,7 @@ const translations: Record<Language, Translations> = {
     },
   },
   fr: {
-    layout: {
+    Layout: {
       appName: "La Réserve",
       appSubtitle: "Système d'inventaire et de caisse",
       nav: {
@@ -920,6 +944,9 @@ const translations: Record<Language, Translations> = {
           champagne: "Champagne et mousseux",
           readyToDrink: "Prêt-à-boire",
           snacks: "Collation",
+          other: "",
+          soda: "",
+          juice: ""
         },
         subcategories: {
           redWine: "Vin rouge",
@@ -949,6 +976,13 @@ const translations: Record<Language, Translations> = {
           uk: "Royaume-Uni",
         },
       },
+      other: "",
+      juice: "",
+      soda: "",
+      beer: "",
+      spirits: "",
+      wine: "",
+      allCategories: ""
     },
     productCard: {
       stockLevel: "Niveau de stock",
@@ -1010,6 +1044,8 @@ const translations: Record<Language, Translations> = {
         cashPayment: "Paiement en espèces reçu ! Total : ",
         orderCompleted: "Commande terminée ! Total : ",
       },
+      accessDenied: "",
+      noSalesPermission: ""
     },
     analytics: {
       title: "Analyses",
@@ -1263,7 +1299,7 @@ const translations: Record<Language, Translations> = {
     },
   },
   es: {
-    layout: {
+    Layout: {
       appName: "Reserva Boveda",
       appSubtitle: "Sistema de inventario y punto de venta",
       nav: {
@@ -1332,6 +1368,9 @@ const translations: Record<Language, Translations> = {
           champagne: "Champán y espumoso",
           readyToDrink: "Listo para beber",
           snacks: "Aperitivos",
+          other: "",
+          soda: "",
+          juice: ""
         },
         subcategories: {
           redWine: "Vino tinto",
@@ -1361,6 +1400,13 @@ const translations: Record<Language, Translations> = {
           uk: "Reino Unido",
         },
       },
+      other: "",
+      juice: "",
+      soda: "",
+      beer: "",
+      spirits: "",
+      wine: "",
+      allCategories: ""
     },
     productCard: {
       stockLevel: "Nivel de stock",
@@ -1422,6 +1468,8 @@ const translations: Record<Language, Translations> = {
         cashPayment: "¡Pago en efectivo recibido! Total: $",
         orderCompleted: "¡Pedido completado! Total: $",
       },
+      accessDenied: "",
+      noSalesPermission: ""
     },
     analytics: {
       title: "Análisis",
@@ -1675,7 +1723,7 @@ const translations: Record<Language, Translations> = {
     },
   },
   de: {
-    layout: {
+    Layout: {
       appName: "Lagerkammer",
       appSubtitle: "Inventar- und Kassensystem",
       nav: {
@@ -1744,6 +1792,9 @@ const translations: Record<Language, Translations> = {
           champagne: "Champagner & Schaumwein",
           readyToDrink: "Trinkfertig",
           snacks: "Snacks",
+          other: "",
+          soda: "",
+          juice: ""
         },
         subcategories: {
           redWine: "Rotwein",
@@ -1773,6 +1824,13 @@ const translations: Record<Language, Translations> = {
           uk: "Vereinigtes Königreich",
         },
       },
+      other: "",
+      juice: "",
+      soda: "",
+      beer: "",
+      spirits: "",
+      wine: "",
+      allCategories: ""
     },
     productCard: {
       stockLevel: "Bestandsniveau",
@@ -1834,6 +1892,8 @@ const translations: Record<Language, Translations> = {
         cashPayment: "Barzahlung erhalten! Gesamt: $",
         orderCompleted: "Bestellung abgeschlossen! Gesamt: $",
       },
+      accessDenied: "",
+      noSalesPermission: ""
     },
     analytics: {
       title: "Analysen",

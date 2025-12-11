@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
-import { useI18n } from "@/contexts/I18nContext";
+import { usei18n } from "@/contexts/i18nContext";
 import { collection, query, orderBy, limit, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firestore";
 import {
@@ -44,7 +44,7 @@ type AITool =
   | "sales-report";
 
 export default function Analytics() {
-  const { t } = useI18n();
+  const { t } = usei18n();
   const [loading, setLoading] = useState(true);
   const [selectedTool, setSelectedTool] = useState<AITool>("insights");
   const [salesPrediction, setSalesPrediction] = useState<{

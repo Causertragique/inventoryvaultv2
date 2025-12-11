@@ -3,6 +3,14 @@
 
 export type UserRole = "owner" | "admin" | "manager" | "employee";
 
+const USER_ROLE_VALUES: readonly UserRole[] = ["owner", "admin", "manager", "employee"] as const;
+
+export function normalizeUserRole(role: unknown): UserRole | null {
+  if (typeof role !== "string") return null;
+  const normalized = role.trim().toLowerCase() as UserRole;
+  return USER_ROLE_VALUES.includes(normalized) ? normalized : null;
+}
+
 export interface Permission {
   canViewInventory: boolean;
   canAddProducts: boolean;

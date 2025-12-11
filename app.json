@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Bartender",
+    "slug": "bartender",
+    "extra": {
+      "eas": {
+        "projectId": "34352a23-735b-47dc-8614-c8890ed0d191"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "y",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}

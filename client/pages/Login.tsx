@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getAuth, OAuthProvider, signInWithPopup } from "firebase/auth";
+// Provider Apple utilisé localement dans le handler
+import { auth } from "@/lib/firebase";
 import { useNavigate } from "react-router-dom";
 import { loginWithEmail, signupWithEmail, loginWithGoogle, resetPassword } from "../services/firestore/auth";
 import { consumeInvite } from "@/services/firestore/invites";
@@ -8,6 +11,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { useToast } from "../hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Login() {
   const [isSignup, setIsSignup] = useState(false);
@@ -18,6 +22,39 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate("/inventory", { replace: true });
+    }
+  }, [authLoading, user, navigate]);
+
+    // Handler pour l'auth Apple
+    const handleAppleAuth = async () => {
+      setLoading(true);
+      try {
+        if (!auth) throw new Error("Apple Auth non initialisé");
+        const provider = new OAuthProvider("apple.com");
+        const result = await signInWithPopup(auth, provider);
+        // Traitement du résultat (sauvegarde, redirection, etc.)
+        console.log("Utilisateur Apple connecté :", result.user);
+        toast({
+          title: "Connexion réussie",
+          description: "Bienvenue !",
+        });
+        navigate("/inventory");
+      } catch (error: any) {
+        console.error("Erreur Apple Auth :", error);
+        toast({
+          title: "Erreur",
+          description: error.message || "Une erreur est survenue",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
   const applyInviteCodeIfAny = async (uid: string) => {
     const code = inviteCode.trim();
@@ -284,17 +321,7 @@ export default function Login() {
             Continuer avec Google
           </Button>
 
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full border-gray-300 hover:bg-gray-50"
-            disabled={loading}
-          >
-            <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z"/>
-            </svg>
-            Continuer avec Apple
-          </Button>
+
 
           <div className="text-center text-sm text-gray-600">
             {isSignup ? (

@@ -2,11 +2,11 @@ import { useLocation, Link } from "react-router-dom";
 import { useEffect } from "react";
 import Layout from "@/components/Layout";
 import { AlertCircle, ArrowRight } from "lucide-react";
-import { useI18n } from "@/contexts/I18nContext";
+import { usei18n } from "@/contexts/i18nContext";
 
 const NotFound = () => {
   const location = useLocation();
-  const { t } = useI18n();
+  const { t } = usei18n();
 
   useEffect(() => {
     console.error(
