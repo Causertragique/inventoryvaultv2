@@ -1,7 +1,7 @@
 import { doc, setDoc, getDoc, getDocs, collection, Timestamp } from "firebase/firestore";
 import { db } from "../../lib/firestore";
 import type { User } from "firebase/auth";
-import { UserRole } from "@/lib/permissions";
+import { UserRole, normalizeUserRole } from "@/lib/permissions";
 
 export interface UserProfile {
   uid: string;
@@ -13,10 +13,9 @@ export interface UserProfile {
   updatedAt: Timestamp;
 }
 
-const DEFAULT_ROLE: UserRole = "employee";
+const DEFAULT_ROLE: UserRole = "owner";
 
-const isValidRole = (role: unknown): role is UserRole =>
-  role === "owner" || role === "admin" || role === "manager" || role === "employee";
+const isValidRole = (role: unknown): role is UserRole => normalizeUserRole(role) !== null;
 
 export interface UserProfileWithId extends UserProfile {
   id: string;
@@ -32,8 +31,8 @@ export async function createOrUpdateUserProfile(user: User): Promise<UserRole> {
   const userSnap = await getDoc(userRef);
   
   const now = Timestamp.now();
-  const existingRole = userSnap.exists() ? (userSnap.data()?.role as UserRole | undefined) : undefined;
-  const roleToPersist = isValidRole(existingRole) ? existingRole : DEFAULT_ROLE;
+  const existingRole = userSnap.exists() ? normalizeUserRole(userSnap.data()?.role) : null;
+  const roleToPersist: UserRole = existingRole || DEFAULT_ROLE;
   
   if (!userSnap.exists()) {
     // Créer un nouveau profil utilisateur

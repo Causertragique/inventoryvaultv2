@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, RefreshCw, Shield, UserCog } from "lucide-react";
-import { useI18n } from "@/contexts/I18nContext";
+import { usei18n } from "@/contexts/i18nContext";
 import { UserRole, ROLE_LABELS, hasPermission, getCurrentUserRole } from "@/lib/permissions";
 import { listUsers, updateUserRole, UserProfileWithId } from "@/services/firestore/users";
 import { createInvite } from "@/services/firestore/invites";
@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isFirebaseConfigured } from "@/lib/firebase";
 
 export default function UserManagement() {
-  const { t, language } = useI18n();
+  const { t, language } = usei18n();
   const { toast } = useToast();
   const [users, setUsers] = useState<UserProfileWithId[]>([]);
   const [loading, setLoading] = useState(true);

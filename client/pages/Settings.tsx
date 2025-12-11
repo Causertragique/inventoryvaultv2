@@ -46,7 +46,7 @@ import {
   Trash2,
   FileDown,
 } from "lucide-react";
-import { useI18n } from "@/contexts/I18nContext";
+import { usei18n } from "@/contexts/i18nContext";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { db, auth, isFirebaseConfigured } from "@/lib/firebase";
@@ -55,10 +55,11 @@ import { deleteUser } from "firebase/auth";
 import { FirestoreUserProfile } from "@shared/firestore-schema";
 import { useNavigate } from "react-router-dom";
 import { ROLE_LABELS, UserRole } from "@/lib/permissions";
+import { InviteEmployeeSection } from "@/components/InviteEmployeeSection";
 
 export default function Settings() {
   const { theme, setTheme } = useTheme();
-  const { language, setLanguage, t } = useI18n();
+  const { language, setLanguage, t } = usei18n();
   const [mounted, setMounted] = useState(false);
   const navigate = useNavigate();
   
@@ -512,14 +513,14 @@ export default function Settings() {
           taxRate: settings.taxRate,
           
           // Profil AI
-          barType: settings.barType,
-          barAmbiance: settings.barAmbiance,
-          primaryClientele: settings.primaryClientele,
-          priceRange: settings.priceRange,
-          businessStage: settings.businessStage,
+          barType: settings.barType as FirestoreUserProfile["barType"],
+          barAmbiance: settings.barAmbiance as FirestoreUserProfile["barAmbiance"],
+          primaryClientele: settings.primaryClientele as FirestoreUserProfile["primaryClientele"],
+          priceRange: settings.priceRange as FirestoreUserProfile["priceRange"],
+          businessStage: settings.businessStage as FirestoreUserProfile["businessStage"],
           yearsFounded: settings.yearsFounded,
           seatingCapacity: settings.seatingCapacity,
-          servingStyle: settings.servingStyle,
+          servingStyle: settings.servingStyle as FirestoreUserProfile["servingStyle"],
           specialties: settings.specialties,
           targetMarket: settings.targetMarket,
           
@@ -1386,8 +1387,8 @@ export default function Settings() {
                 </div>
               </div>
             </CardContent>
-            )}
-          </Card>
+          )}
+        </Card>
 
           {/* Notifications Settings */}
           <Card>
@@ -1782,6 +1783,37 @@ export default function Settings() {
                   </a>
                 </div>
               )}
+              {/* Ressource Humaine - Invitation employés */}
+              {(userRole === "owner" || userRole === "manager") && (
+                <Card>
+                  <CardHeader
+                    className="pb-3 cursor-pointer hover:bg-secondary/50 transition-colors"
+                    onClick={() => toggleSection("ressourceHumaine")}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <Shield className="h-4 w-4" />
+                          Ressource Humaine
+                        </CardTitle>
+                        <CardDescription className="text-xs mt-1">
+                          Générer un code d'invitation pour un nouvel employé.
+                        </CardDescription>
+                      </div>
+                      {openSections.ressourceHumaine ? (
+                        <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </div>
+                  </CardHeader>
+                  {openSections.ressourceHumaine && (
+                    <CardContent className="space-y-2 pt-0">
+                      <InviteEmployeeSection />
+                    </CardContent>
+                  )}
+                </Card>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="stripe-secret-key">Clé secrète Stripe (Secret Key)</Label>
                 <div className="relative">
@@ -1902,8 +1934,8 @@ export default function Settings() {
                 </p>
               </div>
             </CardContent>
-            )}
-          </Card>
+          )}
+        </Card>
 
           {/* Security Section */}
           <Card className="shadow-lg border-2 border-foreground/20">
@@ -2043,6 +2075,7 @@ export default function Settings() {
             </CardContent>
             )}
           </Card>
+        
 
         </div>
 
