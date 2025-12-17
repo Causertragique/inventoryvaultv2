@@ -15,6 +15,7 @@ export interface Product {
   subcategory?: string;
   origin?: string;
   bottleSizeInMl?: number;
+  availableForSale?: boolean;
 }
 
 interface ProductCardProps {
@@ -305,7 +306,7 @@ export default function ProductCard({
                 e.stopPropagation();
                 if (canEdit) onEdit?.(product);
               }}
-              className={`p-2 rounded transition-colors ${canEdit ? "hover:bg-secondary text-muted-foreground hover:text-foreground" : "bg-secondary/50 text-muted-foreground/50 cursor-not-allowed"}`}
+              className={`p-2 transition-colors ${canEdit ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/50 cursor-not-allowed"}`}
               aria-label="Edit product"
               type="button"
               disabled={!canEdit}
@@ -342,7 +343,7 @@ export default function ProductCard({
                 e.stopPropagation();
                 if (canDelete) onDelete?.(product.id);
               }}
-              className={`p-2 rounded transition-colors ${canDelete ? "hover:bg-destructive/20 text-muted-foreground hover:text-destructive" : "bg-secondary/50 text-muted-foreground/50 cursor-not-allowed"}`}
+              className={`p-2 transition-colors ${canDelete ? "text-muted-foreground hover:text-destructive" : "text-muted-foreground/50 cursor-not-allowed"}`}
               aria-label="Delete product"
               type="button"
               disabled={!canDelete}

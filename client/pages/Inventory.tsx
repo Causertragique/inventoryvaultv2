@@ -138,6 +138,7 @@ export default function Inventory() {
             unit: p.unit,
             origin: (p as any).origin,
             bottleSizeInMl: (p as any).bottleSizeInMl,
+            availableForSale: (p as any).availableForSale ?? true,
             imageUrl: (p as any).imageUrl,
           }));
           setProducts(mapped);
@@ -217,7 +218,7 @@ export default function Inventory() {
       if (!canEditProducts) return;
       try {
         const { id, ...updates } = updatedProduct;
-        await updateProduct(user.uid, editingProduct.id, updates as any);
+        await updateProduct(user.uid, editingProduct.id, updates as any, { overwrite: true });
         setProducts((prev) => prev.map((p) => (p.id === editingProduct.id ? updatedProduct : p)));
         await logInventoryChange({
           productId: editingProduct.id,

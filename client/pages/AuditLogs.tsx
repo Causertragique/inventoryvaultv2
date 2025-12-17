@@ -6,7 +6,7 @@ import { Shield, AlertTriangle, CheckCircle, User, Clock, Package, TrendingUp, T
 import { getRecentInventoryLogs, generateAuditReport } from "@/lib/audit";
 import { getUserPermissions, getCurrentUserRole, ROLE_LABELS } from "@/lib/permissions";
 import { FirestoreInventoryLog } from "@shared/firestore-schema";
-import { usei18n } from "@/contexts/i18nContext";
+import { usei18n } from "@/contexts/I18nContext";
 
 export default function AuditLogs() {
   const { t, language } = usei18n();

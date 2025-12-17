@@ -2,15 +2,16 @@ import { useState, useEffect, useMemo } from "react";
 import Layout from "@/components/Layout";
 import PaymentModal from "@/components/PaymentModal";
 import { Product } from "@/components/ProductCard";
-import { Trash2, Plus, Minus, CreditCard, DollarSign, UserPlus, Users, X, FileText, Eye, Wine, Grid3x3, List, Search, SlidersHorizontal } from "lucide-react";
+import { Trash2, Plus, Minus, CreditCard, DollarSign, UserPlus, Users, X, FileText, Eye, Wine, Grid3x3, List, Search, SlidersHorizontal, Edit3 } from "lucide-react";
 import { usei18n } from "@/contexts/I18nContext";
 import { getCurrentUserRole, hasPermission } from "@/lib/permissions";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { updateProduct } from "@/services/firestore/products";
-import { createRecipe } from "@/services/firestore/recipes";
+import { updateProduct, getProducts } from "@/services/firestore/products";
+import { createRecipe, getRecipes } from "@/services/firestore/recipes";
 import { createSale } from "@/services/firestore/sales";
 import { stockAlertsService } from "@/services/firestore/notifications";
+import type { FirestoreProduct } from "@shared/firestore-schema";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +23,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-
 interface CartItem extends Omit<Product, 'category'> {
   userId: string;
   category: "spirits" | "wine" | "beer" | "soda" | "juice" | "other" | "cocktail";
@@ -115,6 +115,74 @@ const SERVING_CATEGORY_LABELS: Record<BaseCategory, string> = {
   other: "Autres",
 };
 
+const VALID_PRODUCT_CATEGORIES: Product["category"][] = [
+  "spirits",
+  "wine",
+  "beer",
+  "soda",
+  "juice",
+  "other",
+];
+
+const normalizeProductCategory = (raw?: string): Product["category"] => {
+  if (!raw) return "other";
+  const normalized = raw.toLowerCase();
+  if (VALID_PRODUCT_CATEGORIES.includes(normalized as Product["category"])) {
+    return normalized as Product["category"];
+  }
+  if (normalized.includes("spirit") || normalized.includes("liqueur")) {
+    return "spirits";
+  }
+  if (normalized.includes("vin") || normalized.includes("wine")) {
+    return "wine";
+  }
+  if (
+    normalized.includes("beer") ||
+    normalized.includes("biere") ||
+    normalized.includes("ale")
+  ) {
+    return "beer";
+  }
+  if (
+    normalized.includes("soda") ||
+    normalized.includes("cola") ||
+    normalized.includes("soft")
+  ) {
+    return "soda";
+  }
+  if (normalized.includes("juice") || normalized.includes("jus")) {
+    return "juice";
+  }
+  return "other";
+};
+
+const mapFirestoreProductToSaleProduct = (product: FirestoreProduct): Product => {
+  const bottleSizeField = (product as any).volume ?? (product as any).bottleSizeInMl;
+  const priceValue =
+    typeof product.price === "number" && Number.isFinite(product.price)
+      ? product.price
+      : 0;
+  return {
+    id: product.id || `${product.name}-${Math.random().toString(36).slice(2, 8)}`,
+    name: product.name,
+    category: normalizeProductCategory(product.category),
+    price: priceValue,
+    quantity: Math.max(0, product.quantity ?? 0),
+    unit: product.unit || "bouteille",
+    origin: (product as any).origin,
+    imageUrl: (product as any).imageUrl,
+    subcategory: product.subcategory,
+    bottleSizeInMl:
+      typeof bottleSizeField === "number" ? bottleSizeField : undefined,
+    availableForSale: product.availableForSale !== false,
+  };
+};
+
+const persistInventoryProducts = (products: Product[]) => {
+  if (typeof window === "undefined") return;
+  localStorage.setItem("inventory-products", JSON.stringify(products));
+};
+
 const PRICING_STORAGE_KEY = "bartender-serving-config";
 
 const loadServingOverrides = (): ServingOverrides => {
@@ -143,6 +211,7 @@ const buildServingItems = (
   overrides: ServingOverrides
 ): Recipe[] => {
   return inventoryProducts
+    .filter((product) => product.availableForSale !== false)
     .map((product) => {
       const baseCategory = (product.category as BaseCategory) || "other";
       const formats = DEFAULT_SERVING_CONFIG[baseCategory];
@@ -179,6 +248,8 @@ export default function Sales() {
   const { user } = useAuth();
   const role = getCurrentUserRole();
   const canProcessSales = hasPermission(role, "canProcessSales");
+  const canEditProducts = hasPermission(role, "canEditProducts");
+  const canDeleteProducts = hasPermission(role, "canDeleteProducts");
   const { toast } = useToast();
   
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -255,6 +326,86 @@ export default function Sales() {
   useEffect(() => {
     localStorage.setItem("sales-view-mode", viewMode);
   }, [viewMode]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const cached = localStorage.getItem("inventory-products");
+    if (!cached) return;
+    try {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed)) {
+        setInventoryProducts(parsed);
+      }
+    } catch (error) {
+      console.warn("[Sales] Impossible d'analyser l'inventaire en cache :", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    let isMounted = true;
+
+    const loadInventory = async () => {
+      try {
+        const firestoreProducts = await getProducts(user.uid);
+        if (!isMounted) return;
+        const normalized = firestoreProducts.map(mapFirestoreProductToSaleProduct);
+        setInventoryProducts(normalized);
+        persistInventoryProducts(normalized);
+      } catch (error) {
+        console.error("[Sales] Échec du chargement de l'inventaire :", error);
+      }
+    };
+
+    loadInventory();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setRecipes([]);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadRecipes = async () => {
+      try {
+        const firestoreRecipes = await getRecipes(user.uid);
+        if (!isMounted) return;
+
+        const normalized: Recipe[] = firestoreRecipes.map((firestoreRecipe) => ({
+          id:
+            firestoreRecipe.id ||
+            `${firestoreRecipe.name}-${Math.random().toString(36).slice(2, 8)}`,
+          name: firestoreRecipe.name,
+          price:
+            typeof (firestoreRecipe as any).price === "number"
+              ? (firestoreRecipe as any).price
+              : 0,
+          ingredients: (firestoreRecipe.ingredients || []).map((ingredient) => ({
+            productId: ingredient.productId,
+            productName: ingredient.productName,
+            quantity: ingredient.quantity,
+            unit: ingredient.unit,
+          })),
+          category:
+            firestoreRecipe.category === "cocktail" ? "cocktail" : "other",
+        }));
+
+        setRecipes(normalized);
+      } catch (error) {
+        console.error("[Sales] échec du chargement des recettes :", error);
+      }
+    };
+
+    loadRecipes();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.uid]);
 
   useEffect(() => {
     saveServingOverrides(servingOverrides);
@@ -391,7 +542,143 @@ export default function Sales() {
       }
     });
     
-    return minServings === Infinity ? 0 : Math.max(0, minServings);
+  return minServings === Infinity ? 0 : Math.max(0, minServings);
+  };
+
+  const getEditableInventoryProduct = (item: Product | Recipe): Product | null => {
+    if (!item) return null;
+    if (!("ingredients" in item)) {
+      return item;
+    }
+    const primaryIngredient = item.ingredients[0];
+    if (!primaryIngredient?.productId) return null;
+    return inventoryProducts.find((p) => p.id === primaryIngredient.productId) || null;
+  };
+
+  const handleEditProduct = async (product: Product) => {
+    if (!canEditProducts) return;
+    if (!user?.uid) {
+      toast({
+        title: "Action impossible",
+        description: "Connectez-vous pour modifier les produits.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const input = window.prompt(
+      `Nouveau prix pour ${product.name} (en dollars)`,
+      product.price.toFixed(2),
+    );
+    if (input === null) return;
+    const value = parseFloat(input.replace(",", "."));
+    if (Number.isNaN(value) || value < 0) {
+      toast({
+        title: "Valeur invalide",
+        description: "Entrez un prix numérique valide.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await updateProduct(user.uid, product.id, { price: value });
+      const updated = inventoryProducts.map((p) =>
+        p.id === product.id ? { ...p, price: value } : p,
+      );
+      setInventoryProducts(updated);
+      persistInventoryProducts(updated);
+      setCart((previous) =>
+        previous.map((item) =>
+          item.id === product.id ? { ...item, price: value } : item,
+        ),
+      );
+      toast({
+        title: "Produit mis à jour",
+        description: `${product.name} est maintenant à $${value.toFixed(2)}`,
+      });
+    } catch (error) {
+      console.error("[Sales] Échec mise à jour produit:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier le produit.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteProduct = async (product: Product) => {
+    if (!canDeleteProducts) return;
+    if (!user?.uid) {
+      toast({
+        title: "Action impossible",
+        description: "Connectez-vous pour masquer la carte de vente.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (
+      !confirm(
+        `Masquer la carte de ${product.name} dans la page Ventes ? Cela n’effacera pas l’inventaire.`,
+      )
+    )
+      return;
+
+    try {
+      await updateProduct(user.uid, product.id, { availableForSale: false });
+      const updated = inventoryProducts.map((p) =>
+        p.id === product.id ? { ...p, availableForSale: false } : p,
+      );
+      setInventoryProducts(updated);
+      persistInventoryProducts(updated);
+      setCart((previous) => previous.filter((item) => item.id !== product.id));
+      toast({
+        title: "Carte masquée",
+        description: `${product.name} n’apparaît plus dans les cartes de vente.`,
+      });
+    } catch (error) {
+      console.error("[Sales] Échec masquer produit:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de masquer la carte.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const renderProductActionIcons = (item: Product | Recipe) => {
+    const editableProduct = getEditableInventoryProduct(item);
+    if (!editableProduct || (!canEditProducts && !canDeleteProducts)) return null;
+    return (
+      <div className="absolute right-2 top-2 z-10 flex gap-1">
+        {canEditProducts && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              handleEditProduct(editableProduct);
+            }}
+            className="h-7 w-7 rounded-full border border-foreground/20 bg-background/70 text-muted-foreground hover:text-foreground hover:border-foreground transition-colors"
+            aria-label={`Modifier ${editableProduct.name}`}
+          >
+            <Edit3 className="h-4 w-4" />
+          </button>
+        )}
+        {canDeleteProducts && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              handleDeleteProduct(editableProduct);
+            }}
+            className="h-7 w-7 rounded-full border border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+            aria-label={`Supprimer ${editableProduct.name}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    );
   };
 
   const addToCart = (product: Product | Recipe) => {
@@ -552,7 +839,7 @@ export default function Sales() {
       });
     }
     
-    localStorage.setItem("inventory-products", JSON.stringify(updatedProducts));
+    persistInventoryProducts(updatedProducts);
   };
 
 
@@ -1034,8 +1321,9 @@ export default function Sales() {
                       key={product.id}
                       onClick={() => addToCart(product)}
                       disabled={availableQuantity <= 0}
-                      className={`p-3 rounded-lg border-2 border-foreground/30 transition-all text-left hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex flex-col h-full min-h-[120px] ${categoryColors[product.category]}`}
+                      className={`relative p-3 rounded-lg border-2 border-foreground/30 transition-all text-left hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex flex-col h-full min-h-[120px] ${categoryColors[product.category]}`}
                     >
+                      {renderProductActionIcons(product)}
                       <p className="font-bold text-base line-clamp-2 min-h-[2.5rem] mb-2">
                         {product.name}
                       </p>
@@ -1067,8 +1355,9 @@ export default function Sales() {
                       key={product.id}
                       onClick={() => addToCart(product)}
                       disabled={availableQuantity <= 0}
-                      className={`w-full p-3 sm:p-4 rounded-lg border-2 border-foreground/30 transition-all text-left hover:border-primary/50 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3 sm:gap-4 ${categoryColors[product.category]}`}
+                      className={`relative w-full p-3 sm:p-4 rounded-lg border-2 border-foreground/30 transition-all text-left hover:border-primary/50 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3 sm:gap-4 ${categoryColors[product.category]}`}
                     >
+                      {renderProductActionIcons(product)}
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-sm sm:text-base line-clamp-1 mb-1">
                           {product.name}
@@ -1162,7 +1451,7 @@ export default function Sales() {
                 </div>
                 {taxCalculation.breakdown ? (
                   <>
-                <div className="flex justify-between text-sm">
+                    <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">{taxCalculation.labels.primary}</span>
                       <span>${(taxCalculation.TPS > 0 ? taxCalculation.TPS : taxCalculation.HST || 0).toFixed(2)}</span>
                     </div>
@@ -1176,8 +1465,8 @@ export default function Sales() {
                 ) : (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">{taxCalculation.labels.primary || t.sales.tax}</span>
-                  <span>${tax.toFixed(2)}</span>
-                </div>
+                    <span>${tax.toFixed(2)}</span>
+                  </div>
                 )}
                 
                 {/* Tip Section */}
@@ -1793,35 +2082,35 @@ export default function Sales() {
             <Button onClick={() => setShowPayTabDialog(false)}>
               {t.common.close}
             </Button>
-                        {/* Dropdown recette cocktail */}
-                        {filterCategory === "cocktail" && (
-                          <div className="mt-4">
-                            <label htmlFor="cocktail-recipe-select" className="block text-sm font-medium text-foreground mb-1">Recette de cocktail</label>
-                            <select
-                              id="cocktail-recipe-select"
-                              className="w-full p-2 border rounded"
-                              onChange={e => {
-                                const selectedRecipe = PRESET_RECIPES.find(r => r.name === e.target.value);
-                                if (selectedRecipe) {
-                                  // Ajoute la recette au panier
-                                  addToCart({
-                                    id: selectedRecipe.name!,
-                                    name: selectedRecipe.name!,
-                                    price: selectedRecipe.price || 0,
-                                    ingredients: selectedRecipe.ingredients || [],
-                                    category: "cocktail",
-                                  });
-                                }
-                              }}
-                            >
-                              <option value="">Sélectionner une recette...</option>
-                              {recipes.filter(r => r.category === "cocktail").map(r => (
-                                <option key={r.name} value={r.name}>{r.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
           </DialogFooter>
+          {/* Dropdown recette cocktail */}
+          {filterCategory === "cocktail" && (
+            <div className="mt-4">
+              <label htmlFor="cocktail-recipe-select" className="block text-sm font-medium text-foreground mb-1">Recette de cocktail</label>
+              <select
+                id="cocktail-recipe-select"
+                className="w-full p-2 border rounded"
+                onChange={e => {
+                  const selectedRecipe = PRESET_RECIPES.find(r => r.name === e.target.value);
+                  if (selectedRecipe) {
+                    // Ajoute la recette au panier
+                    addToCart({
+                      id: selectedRecipe.name!,
+                      name: selectedRecipe.name!,
+                      price: selectedRecipe.price || 0,
+                      ingredients: selectedRecipe.ingredients || [],
+                      category: "cocktail",
+                    });
+                  }
+                }}
+              >
+                <option value="">Sélectionner une recette...</option>
+                {recipes.filter(r => r.category === "cocktail").map(r => (
+                  <option key={r.name} value={r.name}>{r.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -2074,7 +2363,7 @@ const PRODUCT_TYPE_OPTIONS: {
   helper: string;
 }[] = [
   { value: "wine", label: "Vin", helper: "Verre, demi-litre ou bouteille" },
-  { value: "beer", label: "BiŠre", helper: "Verre, pinte ou buck" },
+  { value: "beer", label: "Bière", helper: "Verre, pinte ou buck" },
   { value: "shot", label: "Shot", helper: "Dose de 1,5 oz par défaut" },
   { value: "cocktail", label: "Cocktail", helper: "Recette maison ou standard" },
   { value: "other", label: "Autres", helper: "Mocktails, jus, boissons spéciales" },
@@ -2165,44 +2454,33 @@ const mapProductTypeToCategory = (type: ProductTypeOption): Recipe["category"] =
 
 const matchesProductType = (product: Product, type: ProductTypeOption): boolean => {
   const category = product.category?.toLowerCase?.() || "";
-  const subcategory = (product as any).subcategory?.toLowerCase?.() || "";
-  const name = product.name?.toLowerCase?.() || "";
-
-  if (type === "wine") {
-    return (
-      category === "wine" ||
-      subcategory.includes("wine") ||
-      name.includes("vin") ||
-      name.includes("wine")
-    );
+  switch (type) {
+    case "wine":
+      return category === "wine";
+    case "beer":
+      return category === "beer";
+    case "shot":
+    case "cocktail":
+      return category === "spirits";
+    case "other":
+      return true;
+    default:
+      return true;
   }
-  if (type === "beer") {
-    return (
-      category === "beer" ||
-      name.includes("beer") ||
-      name.includes("bière") ||
-      name.includes("biere")
-    );
-  }
-  if (type === "shot") {
-    return category === "spirits" || subcategory.includes("whisky") || name.includes("shot");
-  }
-  if (type === "cocktail") {
-    return true;
-  }
-  if (type === "other") {
-    return ["soda", "juice", "other"].includes(category);
-  }
-  return true;
 };
 
 const filterProductsForType = (
   type: ProductTypeOption | "",
   products: Product[],
+  options?: { allowFullInventoryForCocktail?: boolean },
 ): Product[] => {
   if (!type) return products;
-  const filtered = products.filter((product) => matchesProductType(product, type));
-  return filtered.length > 0 ? filtered : products;
+
+  if (type === "cocktail" && options?.allowFullInventoryForCocktail) {
+    return products;
+  }
+
+  return products.filter((product) => matchesProductType(product, type));
 };
 
 const isProductTypeOption = (value: ProductTypeOption | ""): value is ProductTypeOption =>
@@ -2220,8 +2498,12 @@ function RecipeForm({ inventoryProducts, recipes: _recipes, onSave, onCancel }: 
   const [ingredientQuantity, setIngredientQuantity] = useState("");
   const [ingredientUnit, setIngredientUnit] = useState("ml");
   const [editingIngredientIndex, setEditingIngredientIndex] = useState<number | null>(null);
+  const [associationDialogOpen, setAssociationDialogOpen] = useState(false);
+  const [associationSearchQuery, setAssociationSearchQuery] = useState("");
   const [profitMargin, setProfitMargin] = useState("40");
   const [recipePrice, setRecipePrice] = useState("");
+
+  // Add inventory product as ingredient
 
   if (!inventoryProducts || !onSave || !onCancel) {
     return <div />;
@@ -2230,11 +2512,15 @@ function RecipeForm({ inventoryProducts, recipes: _recipes, onSave, onCancel }: 
   const requiresContainer =
     isProductTypeOption(productType) && !!CONTAINER_OPTIONS[productType];
   const isCocktailDefault = productType === "cocktail" && selectedContainer === "cocktail-default-recipe";
+  const shouldShowFullCocktailInventory = productType === "cocktail" && !isCocktailDefault;
   const filteredInventoryProducts = useMemo(
-    () => filterProductsForType(productType, inventoryProducts),
-    [productType, inventoryProducts],
+    () =>
+      filterProductsForType(productType, inventoryProducts, {
+        allowFullInventoryForCocktail: shouldShowFullCocktailInventory,
+      }),
+    [productType, inventoryProducts, shouldShowFullCocktailInventory],
   );
-  const shouldShowInventorySelect = !!productType && productType !== "cocktail";
+  const shouldShowInventorySelect = !!productType && !isCocktailDefault;
   const shouldShowManualSearch = productType === "cocktail" && !isCocktailDefault;
 
   useEffect(() => {
@@ -2257,7 +2543,9 @@ function RecipeForm({ inventoryProducts, recipes: _recipes, onSave, onCancel }: 
   }, [selectedContainer, productType]);
 
   const getSuggestedProducts = (): Product[] => {
-    let filtered = filterProductsForType(productType, inventoryProducts);
+    let filtered = filterProductsForType(productType, inventoryProducts, {
+      allowFullInventoryForCocktail: shouldShowFullCocktailInventory,
+    });
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter((product) =>
@@ -2267,6 +2555,28 @@ function RecipeForm({ inventoryProducts, recipes: _recipes, onSave, onCancel }: 
     filtered = filtered.sort((a, b) => a.name.localeCompare(b.name));
     return filtered.slice(0, 20);
   };
+
+  const associationInventoryProducts = useMemo(() => {
+    const baseProducts = filterProductsForType(productType, inventoryProducts, {
+      allowFullInventoryForCocktail: shouldShowFullCocktailInventory || isCocktailDefault,
+    });
+    const query = associationSearchQuery.trim().toLowerCase();
+    let filtered = baseProducts;
+    if (query) {
+      filtered = filtered.filter((product) => {
+        const name = product.name.toLowerCase();
+        const category = product.category?.toLowerCase?.() || "";
+        return name.includes(query) || category.includes(query);
+      });
+    }
+    return filtered.sort((a, b) => a.name.localeCompare(b.name)).slice(0, 30);
+  }, [
+    inventoryProducts,
+    productType,
+    shouldShowFullCocktailInventory,
+    isCocktailDefault,
+    associationSearchQuery,
+  ]);
 
   const handleDefaultRecipeChange = (value: string) => {
     setSelectedDefaultRecipe(value);
@@ -2297,20 +2607,6 @@ function RecipeForm({ inventoryProducts, recipes: _recipes, onSave, onCancel }: 
     }
   };
 
-  const handleBaseProductSelect = (productId: string) => {
-    if (!productType) return;
-    const product = inventoryProducts.find((p) => p.id === productId);
-    if (!product) return;
-    const defaults = getDefaultServingForSelection(productType, selectedContainer);
-    const newIngredient: RecipeIngredient = {
-      productId: product.id,
-      productName: product.name,
-      quantity: defaults.quantity || product.quantity || 0,
-      unit: defaults.unit,
-      sourceMissing: false,
-    };
-    setIngredients([newIngredient]);
-  };
 
   const handleProductSuggestionClick = (product: Product) => {
     if (editingIngredientIndex !== null) {
@@ -2337,6 +2633,35 @@ function RecipeForm({ inventoryProducts, recipes: _recipes, onSave, onCancel }: 
     setIngredientQuantity(defaults.quantity ? String(defaults.quantity) : "");
     setSearchQuery(product.name);
     setShowSuggestions(false);
+  };
+
+  const handleAssociationProductSelect = (product: Product) => {
+    handleProductSuggestionClick(product);
+    setAssociationSearchQuery("");
+    setAssociationDialogOpen(false);
+  };
+
+  const handleAssociationDialogChange = (open: boolean) => {
+    setAssociationDialogOpen(open);
+    if (!open) {
+      setEditingIngredientIndex(null);
+      setAssociationSearchQuery("");
+    }
+  };
+
+  const handleInventoryProductSelect = (product: Product) => {
+    if (!productType) return;
+    const defaults = getDefaultServingForSelection(productType, selectedContainer);
+    setSelectedProductId(product.id);
+    setIngredientUnit(defaults.unit);
+    setIngredientQuantity(defaults.quantity ? String(defaults.quantity) : "");
+    setSearchQuery(product.name);
+    setShowSuggestions(false);
+    setTimeout(() => {
+      if (defaults.quantity) {
+        addIngredient();
+      }
+    }, 0);
   };
 
   const addIngredient = () => {
@@ -2367,10 +2692,11 @@ function RecipeForm({ inventoryProducts, recipes: _recipes, onSave, onCancel }: 
     setSearchQuery("");
   };
 
+
   const startIngredientAssociation = (index: number, name: string) => {
     setEditingIngredientIndex(index);
-    setSearchQuery(name);
-    setShowSuggestions(true);
+    setAssociationSearchQuery(name);
+    setAssociationDialogOpen(true);
   };
 
   const removeIngredient = (index: number) => {
@@ -2454,8 +2780,6 @@ function RecipeForm({ inventoryProducts, recipes: _recipes, onSave, onCancel }: 
 
   const manualSelectionDisabled =
     !productType || (requiresContainer && !selectedContainer);
-  const inventorySelectDisabled =
-    !productType || (requiresContainer && !selectedContainer) || filteredInventoryProducts.length === 0;
   const containerOptions = isProductTypeOption(productType)
     ? CONTAINER_OPTIONS[productType]
     : undefined;
@@ -2507,19 +2831,63 @@ function RecipeForm({ inventoryProducts, recipes: _recipes, onSave, onCancel }: 
 
   const ingredientUnitOptions = ["ml", "oz", "cl", "l", "unit"];
   const manualHelper = !productType
-    ? "Choisissez un type de produit pour voir l'inventaire suggéré"
+    ? "Choisissez un type de produit pour demarrer le questionnaire."
     : requiresContainer && !selectedContainer
-    ? "Sélectionnez d'abord un contenant"
+    ? "Completez d'abord la question 2 (contenant)."
     : isCocktailDefault
-    ? "Les ingrédients proviennent de la recette par défaut. Ajustez-les au besoin."
+    ? "Les ingredients proviennent de la recette standard. Ajustez-les au besoin."
     : null;
 
   return (
-    <div className="space-y-3 py-2">
-      <div className="space-y-2">
+    <>
+      <Dialog open={associationDialogOpen} onOpenChange={handleAssociationDialogChange}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Associer l'ingrédient à l'inventaire</DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Recherchez et sélectionnez un produit pour synchroniser cet ingrédient.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              autoFocus
+              placeholder="Rechercher un produit..."
+              value={associationSearchQuery}
+              onChange={(e) => setAssociationSearchQuery(e.target.value)}
+              className="w-full"
+            />
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {associationInventoryProducts.length > 0 ? (
+                associationInventoryProducts.map((product) => (
+                  <button
+                    key={`${product.id}-assoc`}
+                    type="button"
+                    onClick={() => handleAssociationProductSelect(product)}
+                    className="w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-left transition hover:bg-accent/50"
+                  >
+                    <div className="font-semibold">{product.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {product.category} • {product.quantity} en stock
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">Aucun produit trouvé dans l'inventaire.</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => handleAssociationDialogChange(false)}>
+              Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <div className="space-y-3 py-2">
+        <div className="space-y-2">
         <Label className="text-base font-semibold">1. Type de produit</Label>
-        <p className="text-xs text-muted-foreground">
-          Choisissez entre vin, biere, shot, cocktail ou autres pour définir le type de service.
+    <p className="text-xs text-muted-foreground">
+          Choisissez entre vin, bière, shot, cocktail ou autres pour definir le type de service.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {PRODUCT_TYPE_OPTIONS.map((option) => (
@@ -2544,7 +2912,7 @@ function RecipeForm({ inventoryProducts, recipes: _recipes, onSave, onCancel }: 
         <div className="space-y-2">
           <Label className="text-base font-semibold">2. Contenant</Label>
           <p className="text-xs text-muted-foreground">
-            Sélectionnez le format (verre, demi-litre, pinte, buck, recette par défaut, etc.).
+            Selectionnez le format (verre, demi-litre, pinte, buck, recette par defaut, etc.).
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {containerOptions.map((option) => (
@@ -2568,7 +2936,7 @@ function RecipeForm({ inventoryProducts, recipes: _recipes, onSave, onCancel }: 
         <div className="space-y-1">
           <Label className="text-base font-semibold">2. Contenant</Label>
           <p className="text-xs text-muted-foreground">
-            Aucun contenant particulier n'est requis pour ce type. Vous pouvez passer directement à la question 4.
+            Aucun contenant particulier n'est requis pour ce type. Vous pouvez passer directement a la question 4.
           </p>
         </div>
       )}
@@ -2593,38 +2961,43 @@ function RecipeForm({ inventoryProducts, recipes: _recipes, onSave, onCancel }: 
 
       <div className="space-y-3">
         <Label className="text-base font-semibold">4. Ingrédients / produit</Label>
+        <p className="text-xs text-muted-foreground">
+          Après avoir choisi le type (Q1) et le contenant (Q2), sélectionnez ici ce que vous versez dans ce contenant.
+        </p>
         {manualHelper && (
           <p className="text-xs text-muted-foreground">{manualHelper}</p>
         )}
         {shouldShowInventorySelect && (
-          <div className="space-y-2">
-            <Label className="font-semibold text-sm">Produit de l'inventaire</Label>
+          <div className="space-y-3">
+            <Label className="font-semibold text-sm">Liste de l'inventaire</Label>
             <p className="text-xs text-muted-foreground">
-              Sélectionnez l'article qui sera servi. La quantité est déterminée automatiquement selon le contenant choisi.
+              Cette section liste les articles disponibles dans l'inventaire filtrés selon le type sélectionné.
             </p>
             {filteredInventoryProducts.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {filteredInventoryProducts.map((product) => {
-                  const isSelected = ingredients[0]?.productId === product.id;
-                  return (
-                    <button
-                      type="button"
-                      key={product.id}
-                      disabled={inventorySelectDisabled}
-                      onClick={() => handleBaseProductSelect(product.id)}
-                      className={`p-3 border-2 rounded-lg text-left transition-all ${
-                        isSelected
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      } ${inventorySelectDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
-                    >
-                      <div className="font-semibold text-sm">{product.name}</div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Stock: {product.quantity} - Catégorie: {product.category}
-                      </div>
-                    </button>
-                  );
-                })}
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {filteredInventoryProducts.map((product) => (
+                  <div
+                    key={product.id}
+                    className="w-full p-3 rounded-lg border-2 border-border text-left bg-background/60"
+                  >
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="font-semibold text-sm line-clamp-1">{product.name}</span>
+                      <span className="text-xs text-muted-foreground">{product.quantity} en stock</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Catégorie : {product.category}
+                    </p>
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleInventoryProductSelect(product)}
+                        className="text-xs font-semibold text-primary hover:underline"
+                      >
+                        Utiliser ce produit
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="text-xs text-destructive">
@@ -2716,24 +3089,33 @@ function RecipeForm({ inventoryProducts, recipes: _recipes, onSave, onCancel }: 
 
         {ingredients.length > 0 ? (
           <div className="space-y-2 border-2 border-dashed rounded-lg p-4 bg-background/50">
-            {ingredients.map((ingredient, index) => (
-              <div
-                key={`${ingredient.productId || ingredient.productName}-${index}`}
-                className="space-y-2 border border-border rounded-lg p-3 bg-card/50"
-              >
+            {ingredients.map((ingredient, index) => {
+              const ingredientProduct = ingredient.productId
+                ? inventoryProducts.find((p) => p.id === ingredient.productId)
+                : null;
+              const isOutOfStock =
+                ingredientProduct && ingredientProduct.quantity <= 0;
+              return (
+                <div
+                  key={`${ingredient.productId || ingredient.productName}-${index}`}
+                  className="space-y-2 border border-border rounded-lg p-3 bg-card/50"
+                >
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="font-semibold text-sm">{ingredient.productName}</p>
-                    {(!ingredient.productId || ingredient.sourceMissing) ? (
-                      <p className="text-xs text-destructive flex items-center gap-2">
-                        Non lié à l'inventaire
+                    {!ingredient.productId || ingredient.sourceMissing ? (
+                      <div className="text-xs text-destructive flex flex-col gap-2">
                         <button
                           type="button"
                           onClick={() => startIngredientAssociation(index, ingredient.productName)}
-                          className="text-primary underline"
+                          className="text-primary underline text-left"
                         >
-                          Associer
+                          Chercher dans l'inventaire
                         </button>
+                      </div>
+                    ) : isOutOfStock ? (
+                      <p className="text-xs text-destructive">
+                        Produit disponible mais actuellement en rupture de stock
                       </p>
                     ) : (
                       <p className="text-xs text-muted-foreground">Ingrédient synchronisé</p>
@@ -2768,7 +3150,8 @@ function RecipeForm({ inventoryProducts, recipes: _recipes, onSave, onCancel }: 
                   </select>
                 </div>
               </div>
-            ))}
+            );
+          })}
           </div>
         ) : (
           <div className="text-sm text-muted-foreground border-2 border-dashed rounded-lg p-4">
@@ -2828,5 +3211,6 @@ function RecipeForm({ inventoryProducts, recipes: _recipes, onSave, onCancel }: 
         </Button>
       </DialogFooter>
     </div>
+  </>
   );
 }

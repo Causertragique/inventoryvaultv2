@@ -63,9 +63,9 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
     canViewInventory: true,
     canAddProducts: true,
     canEditProducts: true,
-    canDeleteProducts: false, // Les managers ne peuvent pas supprimer
+    canDeleteProducts: true,
     canAdjustQuantity: true,
-    canEditPrices: false, // Les managers ne peuvent pas modifier les prix
+    canEditPrices: true,
     canViewSales: true,
     canProcessSales: true,
     canViewAnalytics: true,
@@ -186,8 +186,8 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, { fr: string; en: string }> = {
     en: "Full access to all features",
   },
   manager: {
-    fr: "Gestion de l'inventaire et des ventes, sans modification des prix",
-    en: "Inventory and sales management, no price editing",
+    fr: "Gestion complète de l'inventaire et des ventes",
+    en: "Full inventory and sales management",
   },
   employee: {
     fr: "Ventes uniquement, lecture seule pour l'inventaire",

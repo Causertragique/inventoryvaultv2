@@ -69,7 +69,7 @@ export async function updateProduct(
   userId: string,
   productId: string,
   updates: Partial<Product>,
-  options?: { allowCreateIfMissing?: boolean }
+  options?: { allowCreateIfMissing?: boolean; overwrite?: boolean }
 ): Promise<void> {
   if (!db) throw new Error("Firestore not initialized");
 
@@ -91,7 +91,7 @@ export async function updateProduct(
     payload.createdAt = Timestamp.now();
   }
 
-  await setDoc(docRef, payload, { merge: true });
+  await setDoc(docRef, payload, { merge: !options?.overwrite });
 }
 
 // Supprimer un produit

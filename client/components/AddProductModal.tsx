@@ -187,6 +187,7 @@ export default function AddProductModal(props: AddProductModalProps) {
     inventoryCode: "",
     imageUrl: "",
     bottleSizeInMl: "",
+    availableForSale: true,
   }));
 
   // Suggestion automatique depuis le CSV importé
@@ -238,6 +239,7 @@ export default function AddProductModal(props: AddProductModalProps) {
         inventoryCode: editingProduct.id || "",
         imageUrl: editingProduct.imageUrl || "",
         bottleSizeInMl: (editingProduct.bottleSizeInMl || "").toString(),
+        availableForSale: editingProduct.availableForSale ?? true,
       });
       // Remplissage automatique du pays d'origine via l'API Excel
       if (editingProduct.name && editingProduct.category) {
@@ -262,6 +264,7 @@ export default function AddProductModal(props: AddProductModalProps) {
         inventoryCode: "",
         imageUrl: "",
         bottleSizeInMl: "",
+        availableForSale: true,
       });
       setWasCodeManuallySet(false);
     }
@@ -1103,6 +1106,7 @@ export default function AddProductModal(props: AddProductModalProps) {
         inventoryCode: prev.inventoryCode || "",
         imageUrl: (updates.imageUrl ?? prev.imageUrl) || "",
         bottleSizeInMl: (updates.bottleSizeInMl ?? prev.bottleSizeInMl) || "",
+        availableForSale: prev.availableForSale,
       }));
       
       setShowProductSelection(false);
@@ -1177,6 +1181,7 @@ export default function AddProductModal(props: AddProductModalProps) {
       subcategory: formData.subcategory || undefined,
       origin: formData.origin || undefined,
       bottleSizeInMl: formData.bottleSizeInMl ? parseInt(formData.bottleSizeInMl) : undefined,
+      availableForSale: formData.availableForSale ?? true,
     };
 
     onSave(product);
@@ -1212,6 +1217,7 @@ export default function AddProductModal(props: AddProductModalProps) {
       inventoryCode: "",
       imageUrl: "",
       bottleSizeInMl: "",
+      availableForSale: true,
     });
     setQrCodeValue("");
     setWasCodeManuallySet(false);
@@ -1585,8 +1591,32 @@ export default function AddProductModal(props: AddProductModalProps) {
               onChange={(e) => handlePriceChange(e.target.value)}
               onBlur={handlePriceBlur}
               placeholder="0.00"
-              title="Prix restauration — référence S.A.Q. 2025-11-09"
+              title="Prix restauration - référence S.A.Q. 2025-11-09"
             />
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-sm font-semibold">
+              Disponible à la vente ?
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Décochez cette case si ce produit n'est utilisé que comme ingrédient
+              pour des recettes et ne doit pas créer de carte distincte.
+            </p>
+            <label className="inline-flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={formData.availableForSale ?? true}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    availableForSale: e.target.checked,
+                  }))
+                }
+                className="h-4 w-4 rounded border-2 border-foreground/30"
+              />
+              Vendu individuellement
+            </label>
           </div>
 
 
@@ -1840,4 +1870,3 @@ export default function AddProductModal(props: AddProductModalProps) {
     </>
   );
 }
-

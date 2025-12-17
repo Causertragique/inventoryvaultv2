@@ -142,8 +142,22 @@ export interface FirestoreProduct {
   volume?: number; // ml
   origin?: string; // Pays/région
   userId: string;
+  availableForSale?: boolean;
   createdAt?: any;
   updatedAt?: any;
+}
+
+export interface FirestoreProductSale {
+  id?: string;
+  productId: string;
+  productName: string;
+  category?: keyof typeof PRODUCT_CATEGORIES | string;
+  price: number;
+  quantity: number;
+  unit: string;
+  source?: "pos" | "recipe" | "other";
+  userId: string;
+  timestamp?: any;
 }
 
 // Type pour les recettes

@@ -1,41 +1,24 @@
 import React, { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
-import { usei18n } from "@/contexts/i18nContext";
+import { usei18n } from "@/contexts/I18nContext";
 import { collection, query, orderBy, limit, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firestore";
 import {
   BarChart3,
   TrendingUp,
-  TrendingDown,
-  Package,
   Lightbulb,
   Sparkles,
-  ArrowUpRight,
-  ArrowDownRight,
   Brain,
   Eye,
   UtensilsCrossed,
   RefreshCw,
-  Clock,
   AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-interface SalesPrediction {
-  date: string;
-  predictedRevenue: number;
-  confidence: number;
-}
 
-interface Insight {
-  type: string;
-  title: string;
-  value: string;
-  trend: "positive" | "negative" | "neutral" | "warning";
-  description: string;
-}
 
 type AITool = 
   | "insights"
@@ -44,8 +27,7 @@ type AITool =
   | "sales-report";
 
 export default function Analytics() {
-  const { t } = usei18n();
-  const [loading, setLoading] = useState(true);
+  usei18n();
   const [selectedTool, setSelectedTool] = useState<AITool>("insights");
   const [salesPrediction, setSalesPrediction] = useState<{
     topSellers: Array<{
@@ -130,16 +112,6 @@ export default function Analytics() {
   };
 
   // Nettoyer tout le cache (appelé à la déconnexion)
-  const clearAllCache = () => {
-    const userId = localStorage.getItem("bartender-user-id") || "default";
-    const tools: AITool[] = [
-      "insights", "sales-prediction", "food-wine-pairing"
-    ];
-    tools.forEach(tool => {
-      localStorage.removeItem(`analytics-cache-${userId}-${tool}`);
-    });
-    console.log("[Analytics] Cache nettoyé pour tous les outils");
-  };
 
   // Restaurer les données au chargement du composant
   useEffect(() => {
@@ -618,12 +590,6 @@ export default function Analytics() {
     return trend;
   };
 
-  const getTrendIcon = (trend: string) => {
-    if (trend === "positive") return <TrendingUp className="h-4 w-4" />;
-    if (trend === "negative") return <TrendingDown className="h-4 w-4" />;
-    if (trend === "warning") return <AlertTriangle className="h-4 w-4" />;
-    return <Clock className="h-4 w-4" />;
-  };
 
   const aiTools: Array<{ id: AITool; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>> }> = [
     { id: "insights", label: "Insights généraux", icon: Eye },
