@@ -1,11 +1,16 @@
 {
   "hosting": {
-    "target": "app",
-    "public": "dist/spa",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
     "rewrites": [
-      { "source": "/api/**", "function": "api" },
-      { "source": "**", "destination": "/index.html" }
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
     ]
   },
   "functions": [
@@ -27,6 +32,8 @@
     }
   ],
   "firestore": {
+    "database": "inventoryvault",
+    "location": "us-central1",
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },

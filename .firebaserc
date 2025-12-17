@@ -1,19 +1,12 @@
 {
   "projects": {
-    "default": "inventoryvault"
+    "default": "inventoryvaultv2"
   },
   "targets": {
-    "inventoryvault": {
+    "inventoryvaultv2": {
       "hosting": {
         "app": [
-          "inventoryvault"
-        ]
-      }
-    },
-    "inventorybar": {
-      "hosting": {
-        "app": [
-          "inventorybar"
+          "inventoryvaultv2"
         ]
       }
     }

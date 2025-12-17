@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { User } from "firebase/auth";
 import { onAuthChange } from "../services/firestore/auth";
 import { getUserProfile } from "../services/firestore/users";
-import { UserRole, normalizeUserRole } from "@/lib/permissions";
+import { normalizeUserRole } from "@/lib/permissions";
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);

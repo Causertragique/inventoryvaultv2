@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { QRCodeSVG } from "qrcode.react";
-import { usei18n } from "@/contexts/i18nContext";
+import { usei18n } from "@/contexts/I18nContext";
 import { Product } from "./ProductCard";
 import { Download, RefreshCw, Search, Image as ImageIcon } from "lucide-react";
 import { parseSaqProductPage, type SaqProductDetails } from "@shared/saq-parser";
@@ -216,13 +216,6 @@ export default function AddProductModal(props: AddProductModalProps) {
       // Determine search scope based on category or forced preference
       // Beer, juice, soda, and snacks are not sold at SAQ - use general web search
       const currentCategory = formData.category.toLowerCase();
-      const isNonSAQCategory = 
-        currentCategory === "beer" || 
-        currentCategory === "juice" ||
-        currentCategory === "soda" ||
-        currentCategory === "readytodrink" || 
-        currentCategory === "other" ||
-        currentCategory.includes("snack");
       
       // Determine if we should search SAQ based on forced preference or category
       const shouldSearchSAQ = forceSAQSearch;
@@ -401,7 +394,7 @@ export default function AddProductModal(props: AddProductModalProps) {
                 if (imageResponse.ok) {
             const imageData = await imageResponse
               .json()
-              .catch(() => ({ images: [] }));
+              .catch(() => ({ images: [] as { imageUrl: string; contextUrl?: string; thumbnailUrl?: string }[] }));
             console.log("[Image search] backend /api/image-search response:", imageData);
 
                   if (imageData.images && imageData.images.length > 0) {

@@ -1,13 +1,4 @@
 {
-  "indexes": [
-    {
-      "collectionGroup": "products",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "category", "order": "ASCENDING" },
-        { "fieldPath": "name", "order": "ASCENDING" }
-      ]
-    }
-  ],
+  "indexes": [],
   "fieldOverrides": []
 }

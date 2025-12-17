@@ -5,7 +5,6 @@ import {
   onAuthStateChanged,
   User,
   signInWithPopup,
-  GoogleAuthProvider,
   sendPasswordResetEmail
 } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
@@ -78,7 +77,6 @@ export async function logout(): Promise<void> {
   localStorage.removeItem("bartender-user");
   localStorage.removeItem("bartender-user-id");
   localStorage.removeItem("bartender-username");
-  localStorage.removeItem("bartender-user-role");
   
   // Nettoyer les caches analytics
   const keysToRemove: string[] = [];

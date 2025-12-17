@@ -2,6 +2,22 @@ import { initializeApp, getApps, FirebaseApp } from "firebase/app";
 import { getAuth, Auth, GoogleAuthProvider } from "firebase/auth";
 import { initializeFirestore, Firestore } from "firebase/firestore";
 
+const shouldForceLongPolling = (() => {
+  if (import.meta.env.VITE_FIRESTORE_FORCE_LONG_POLLING === "true") {
+    return true;
+  }
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const host = window.location.hostname;
+  const isLocalHost =
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host.endsWith(".local");
+  return isLocalHost;
+})();
+
 // Configuration Firebase - Les valeurs doivent être définies dans les variables d'environnement
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -39,12 +55,25 @@ if (firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.project
     }
     
     auth = getAuth(app);
-    // Use auto long polling detection to avoid "client is offline" errors on restrictive networks
+    // Use long polling fallback on restrictive networks / localhost dev
     if (!db) {
-      db = initializeFirestore(app, {
-        experimentalAutoDetectLongPolling: true,
+      const firestoreSettings = {
+        experimentalAutoDetectLongPolling: !shouldForceLongPolling,
+        experimentalForceLongPolling: shouldForceLongPolling,
         useFetchStreams: false,
-      });
+      };
+
+      if (shouldForceLongPolling) {
+        console.warn(
+          "[Firebase] Firestore long-polling forcé (environnement réseau restreint détecté)"
+        );
+      } else {
+        console.log(
+          "[Firebase] Firestore auto-détecte le meilleur transport réseau"
+        );
+      }
+
+      db = initializeFirestore(app, firestoreSettings);
     }
     console.log("Firebase Auth et Firestore initialisés");
   } catch (error) {
