@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createInvite } from "@/services/firestore/invites";
+import { useAuth } from "@/hooks/useAuth";
 import { UserRole, ROLE_LABELS } from "@/lib/permissions";
 
 export function InviteEmployeeSection() {
@@ -9,13 +10,19 @@ export function InviteEmployeeSection() {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const handleGenerateInvite = async () => {
     setLoading(true);
     setError(null);
     try {
-      const code = await createInvite(inviteRole);
-      setInviteCode(code);
+      if (!user?.uid) {
+        setError("Utilisateur non authentifié.");
+        setLoading(false);
+        return;
+      }
+      const invite = await createInvite(inviteRole, user.uid);
+      setInviteCode(invite.code);
     } catch (err: any) {
       setError("Erreur lors de la génération du code.");
     } finally {
@@ -27,7 +34,7 @@ export function InviteEmployeeSection() {
     <div className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-1">Rôle à attribuer :</label>
-        <Select value={inviteRole} onValueChange={setInviteRole}>
+        <Select value={inviteRole} onValueChange={(value) => setInviteRole(value as UserRole)}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Choisir le rôle" />
           </SelectTrigger>

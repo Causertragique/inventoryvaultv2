@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { CreditCard, Loader2, AlertCircle, Check, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { usei18n } from "@/contexts/i18nContext";
+import { usei18n } from "@/contexts/I18nContext";
 import {
   initializeStripeTerminal,
   discoverAndConnectReader,
@@ -10,7 +10,6 @@ import {
   confirmPaymentOnServer,
   cancelPayment,
   disconnectReader,
-  getReaderStatus,
 } from "@/services/stripe";
 
 interface StripeTerminalPaymentProps {

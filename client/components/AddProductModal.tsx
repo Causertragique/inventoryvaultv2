@@ -25,6 +25,136 @@ import { Product } from "./ProductCard";
 import { Download, RefreshCw, Search, Image as ImageIcon } from "lucide-react";
 import { parseSaqProductPage, type SaqProductDetails } from "@shared/saq-parser";
 
+const SEARCH_SOURCE_KEY = "inventory-search-source";
+
+const formatPriceValue = (
+  value: string | number | null | undefined
+): string => {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  const normalized = String(value)
+    .replace(/,/g, ".")
+    .replace(/[^0-9.]/g, "");
+  if (!normalized) {
+    return "";
+  }
+  const parsed = parseFloat(normalized);
+  if (Number.isNaN(parsed)) {
+    return "";
+  }
+  return parsed.toFixed(2);
+};
+
+const normalizePriceInput = (rawValue: string): string => {
+  const cleaned = rawValue.replace(/,/g, ".").replace(/[^0-9.]/g, "");
+  if (!cleaned) {
+    return "";
+  }
+  const [rawInt, ...rest] = cleaned.split(".");
+  let intPart = rawInt || "";
+  if (intPart.length > 1) {
+    intPart = intPart.replace(/^0+(?=\d)/, "");
+  }
+  const decimals = rest.join("");
+  if (rest.length === 0) {
+    return intPart;
+  }
+  const normalizedInt = intPart === "" ? "0" : intPart;
+  return `${normalizedInt}.${decimals.slice(0, 2)}`;
+};
+
+const toStoredPrice = (value: string): number => {
+  const parsed = parseFloat(value);
+  if (Number.isNaN(parsed)) {
+    return 0;
+  }
+  return Math.round(parsed * 100) / 100;
+};
+
+const getInitialSearchPreference = (): boolean => {
+  if (typeof window === "undefined") return true;
+  const stored = localStorage.getItem(SEARCH_SOURCE_KEY);
+  if (stored === "web") return false;
+  if (stored === "saq") return true;
+  return true;
+};
+
+type FetchWithTimeoutOptions = RequestInit & { timeout?: number };
+
+const fetchWithTimeout = async (
+  url: string,
+  options: FetchWithTimeoutOptions = {}
+): Promise<Response> => {
+  const { timeout = 15000, ...rest } = options;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    return await fetch(url, { ...rest, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const HTTP_URL_REGEX = /^https?:\/\//i;
+const CANDIDATE_IMAGE_KEYS = [
+  "src",
+  "source",
+  "url",
+  "link",
+  "image",
+  "imageUrl",
+  "imageURL",
+  "contentUrl",
+  "thumbnail",
+  "thumbnailUrl",
+  "thumbnailURL",
+  "og:image",
+  "og:image:url",
+  "og:image:secure_url",
+  "og:image:secure-url",
+  "twitter:image",
+  "twitter:image:src",
+];
+
+type NormalizedImageCandidate = {
+  imageUrl: string;
+  thumbnailUrl?: string;
+  contextUrl?: string;
+};
+
+const extractImageUrl = (data: any): string | null => {
+  if (!data) return null;
+  if (typeof data === "string") {
+    return HTTP_URL_REGEX.test(data) ? data : null;
+  }
+  if (typeof data === "object") {
+    for (const key of CANDIDATE_IMAGE_KEYS) {
+      const value = data[key];
+      if (typeof value === "string" && HTTP_URL_REGEX.test(value)) {
+        return value;
+      }
+    }
+  }
+  return null;
+};
+
+const normalizeImageCandidate = (candidate: any): NormalizedImageCandidate | null => {
+  const primary = extractImageUrl(candidate);
+  if (!primary) return null;
+  let thumbnail: string | null = null;
+  if (typeof candidate === "object") {
+    thumbnail =
+      extractImageUrl(candidate.thumbnail ?? candidate.thumbnailUrl ?? candidate.thumbnailURL) ||
+      extractImageUrl(candidate["og:image:thumbnail"]) ||
+      extractImageUrl(candidate["twitter:image:src"]);
+  }
+  return {
+    imageUrl: primary,
+    thumbnailUrl: thumbnail || undefined,
+  };
+};
+
 
 interface AddProductModalProps {
   isOpen: boolean;
@@ -70,9 +200,10 @@ export default function AddProductModal(props: AddProductModalProps) {
         return matchName && matchCategory;
       });
       if (match) {
+        const formattedPrice = formatPriceValue(match.price);
         setFormData(prev => ({
           ...prev,
-          pricePerBottle: match.price ? match.price.toString() : prev.pricePerBottle,
+          pricePerBottle: formattedPrice || prev.pricePerBottle,
           origin: match.origin || prev.origin,
           bottleSizeInMl: match.format || prev.bottleSizeInMl,
         }));
@@ -96,13 +227,14 @@ export default function AddProductModal(props: AddProductModalProps) {
         return "other"; // Default fallback
       };
 
+      const formattedEditingPrice = formatPriceValue(editingProduct.price);
       setFormData({
         name: editingProduct.name || "",
         category: mapProductCategoryToFormCategory(editingProduct.category),
         subcategory: editingProduct.subcategory || "",
         origin: editingProduct.origin || "",
         quantity: editingProduct.quantity.toString() || "",
-        pricePerBottle: editingProduct.price.toString() || "",
+        pricePerBottle: formattedEditingPrice || "",
         inventoryCode: editingProduct.id || "",
         imageUrl: editingProduct.imageUrl || "",
         bottleSizeInMl: (editingProduct.bottleSizeInMl || "").toString(),
@@ -152,15 +284,16 @@ export default function AddProductModal(props: AddProductModalProps) {
   const [isSearchingImage, setIsSearchingImage] = useState(false);
   const [searchResults, setSearchResults] = useState<
     Array<{
-    imageUrl: string;
-    productPageUrl: string;
-    title: string;
-    snippet?: string;
+      imageUrl: string;
+      productPageUrl: string;
+      title: string;
+      snippet?: string;
+      thumbnailUrl?: string;
     }>
   >([]);
   const [showProductSelection, setShowProductSelection] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [forceSAQSearch, setForceSAQSearch] = useState<boolean>(true); // Default to SAQ
+  const [forceSAQSearch, setForceSAQSearch] = useState<boolean>(() => getInitialSearchPreference());
   const PRODUCTS_PER_PAGE = 5;
   const MAX_PAGES = 3;
   const isMountedRef = useRef(true);
@@ -172,6 +305,11 @@ export default function AddProductModal(props: AddProductModalProps) {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(SEARCH_SOURCE_KEY, forceSAQSearch ? "saq" : "web");
+  }, [forceSAQSearch]);
+
   // Fetch product options from SAQ.com (returns multiple results)
   // MUST be defined before searchProductImage
   const fetchProductOptions = async (
@@ -179,10 +317,11 @@ export default function AddProductModal(props: AddProductModalProps) {
     productName: string
   ): Promise<
     Array<{
-    imageUrl: string;
-    productPageUrl: string;
-    title: string;
-    snippet?: string;
+      imageUrl: string;
+      productPageUrl: string;
+      title: string;
+      snippet?: string;
+      thumbnailUrl?: string;
     }>
   > => {
     try {
@@ -251,7 +390,7 @@ export default function AddProductModal(props: AddProductModalProps) {
         googleQuery
       )}&num=10&safe=active`;
 
-      const webResponse = await fetch(webSearchUrl);
+      const webResponse = await fetchWithTimeout(webSearchUrl, { timeout: 12000 });
       if (!webResponse.ok) {
         const errorText = await webResponse.text().catch(() => "");
         console.error(
@@ -281,31 +420,30 @@ export default function AddProductModal(props: AddProductModalProps) {
       }
       
       // Extraire les images depuis les résultats web si disponibles (pagemap)
-      const webImages: any[] = [];
+      const webImages: NormalizedImageCandidate[] = [];
       allItems.forEach((item: any) => {
-        // Vérifier pagemap pour les images
-        if (item.pagemap) {
-          // Essayer différents formats d'images dans pagemap
-          const imageSources = [
-            item.pagemap.cse_image,
-            item.pagemap.image,
-            item.pagemap.metatags?.find((tag: any) => tag["og:image"] || tag["twitter:image"]),
-          ].filter(Boolean);
-          
-          imageSources.forEach((images: any) => {
-            const imgArray = Array.isArray(images) ? images : [images];
-            imgArray.forEach((img: any) => {
-              const imageUrl = img.src || img.url || img;
-              if (imageUrl && typeof imageUrl === 'string' && imageUrl.startsWith('http')) {
-                webImages.push({
-                  imageUrl: imageUrl,
-                  contextUrl: item.link,
-                  thumbnailUrl: imageUrl,
-                });
-                }
-            });
-          });
+        const pagemap = item.pagemap;
+        if (!pagemap) return;
+        const imageSources: any[] = [];
+        if (pagemap.cse_image) imageSources.push(pagemap.cse_image);
+        if (pagemap.image) imageSources.push(pagemap.image);
+        if (pagemap.cse_thumbnail) imageSources.push(pagemap.cse_thumbnail);
+        if (Array.isArray(pagemap.metatags)) {
+          imageSources.push(...pagemap.metatags);
         }
+        
+        imageSources.forEach((images: any) => {
+          const imgArray = Array.isArray(images) ? images : [images];
+          imgArray.forEach((img: any) => {
+            const normalized = normalizeImageCandidate(img);
+            if (normalized) {
+              webImages.push({
+                ...normalized,
+                contextUrl: item.link,
+              });
+            }
+          });
+        });
       });
       console.log("[Image search] Images extracted from web results:", webImages.length);
 
@@ -380,15 +518,16 @@ export default function AddProductModal(props: AddProductModalProps) {
       }
 
       // Chercher des images via l'API backend (fallback si pas d'images dans web results)
-      let allImageItems: any[] = [...webImages]; // Commencer avec les images extraites des résultats web
+      let allImageItems: NormalizedImageCandidate[] = [...webImages]; // Commencer avec les images extraites des résultats web
       
       // Si on n'a pas assez d'images, essayer l'API backend
       if (allImageItems.length === 0) {
               try {
-                const imageResponse = await fetch("/api/image-search", {
+                const imageResponse = await fetchWithTimeout("/api/image-search", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ productName }),
+                  timeout: 10000,
                 });
                 
                 if (imageResponse.ok) {
@@ -398,11 +537,21 @@ export default function AddProductModal(props: AddProductModalProps) {
             console.log("[Image search] backend /api/image-search response:", imageData);
 
                   if (imageData.images && imageData.images.length > 0) {
-                    allImageItems = imageData.images.map((img: any) => ({
-                imageUrl: img.imageUrl,
-                contextUrl: img.contextUrl,
-                thumbnailUrl: img.thumbnailUrl,
-                    }));
+                    allImageItems = imageData.images
+                      .map((img: any) => {
+                        const normalized = normalizeImageCandidate({
+                          imageUrl: img.imageUrl,
+                          thumbnailUrl: img.thumbnailUrl,
+                        });
+                        if (!normalized) {
+                          return null;
+                        }
+                        return {
+                          ...normalized,
+                          contextUrl: img.contextUrl,
+                        };
+                      })
+                      .filter(Boolean) as NormalizedImageCandidate[];
                   }
                 } else {
             console.warn(
@@ -429,10 +578,11 @@ export default function AddProductModal(props: AddProductModalProps) {
 
       // Associer les images aux produits
       const results: Array<{
-                  imageUrl: string;
-                  productPageUrl: string;
-                  title: string;
-                  snippet?: string;
+        imageUrl: string;
+        productPageUrl: string;
+        title: string;
+        snippet?: string;
+        thumbnailUrl?: string;
       }> = productPages.map((product, index) => {
         // Essayer de trouver une image correspondante
         let match = allImageItems.find((img: any) => {
@@ -451,12 +601,13 @@ export default function AddProductModal(props: AddProductModalProps) {
         if (!match && allImageItems.length > 0) {
           match = allImageItems[index] || allImageItems[0];
         }
-
+        const fallbackImage = match?.imageUrl || match?.thumbnailUrl || "";
         return {
-          imageUrl: match?.imageUrl || "",
-                productPageUrl: product.productPageUrl,
-                title: product.title,
-                snippet: product.snippet,
+          imageUrl: fallbackImage,
+          thumbnailUrl: match?.thumbnailUrl,
+          productPageUrl: product.productPageUrl,
+          title: product.title,
+          snippet: product.snippet,
         };
       });
 
@@ -472,7 +623,7 @@ export default function AddProductModal(props: AddProductModalProps) {
       return results;
     } catch (error) {
       console.error("Error fetching product options:", error);
-      return [];
+      throw error;
     }
   };
 
@@ -519,6 +670,28 @@ export default function AddProductModal(props: AddProductModalProps) {
     }
   };
 
+  const handlePriceChange = (value: string) => {
+    if (!value) {
+      setFormData((prev) => ({ ...prev, pricePerBottle: "" }));
+      return;
+    }
+    const normalized = normalizePriceInput(value);
+    setFormData((prev) => ({ ...prev, pricePerBottle: normalized }));
+  };
+
+  const handlePriceBlur = () => {
+    if (!formData.pricePerBottle) {
+      return;
+    }
+    const parsed = parseFloat(formData.pricePerBottle);
+    if (!Number.isNaN(parsed)) {
+      setFormData((prev) => ({
+        ...prev,
+        pricePerBottle: parsed.toFixed(2),
+      }));
+    }
+  };
+
   const handleCategoryChange = (category: string) => {
     setFormData((prev) => {
       let bottleSizeDefault = "";
@@ -538,6 +711,10 @@ export default function AddProductModal(props: AddProductModalProps) {
         bottleSizeInMl: bottleSizeDefault,
       };
     });
+  };
+
+  const handleSearchSourceChange = (useSAQ: boolean) => {
+    setForceSAQSearch(useSAQ);
   };
 
   const getSubcategories = () => {
@@ -611,6 +788,10 @@ export default function AddProductModal(props: AddProductModalProps) {
 
   // Search for product image intelligently
   const searchProductImage = async () => {
+    if (isSearchingImage) {
+      console.warn("[Image search] Search already in progress, ignoring new request");
+      return;
+    }
     if (!formData.name.trim()) {
       alert(
         t.inventory.addProductModal.fillRequiredFields ||
@@ -650,12 +831,19 @@ export default function AddProductModal(props: AddProductModalProps) {
           "Aucune image trouvée automatiquement. Vous pouvez entrer l'URL de l'image manuellement dans le champ ci-dessous.";
         alert(message);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error searching for image:", error);
       if (!isMountedRef.current) return;
-      const errorMessage =
-        t.inventory.addProductModal.imageSearchError ||
-        "Erreur lors de la recherche d'image. Vous pouvez entrer l'URL manuellement dans le champ ci-dessous.";
+      const timedOut =
+        error &&
+        typeof error === "object" &&
+        (error.name === "AbortError" ||
+          error.message?.toString().toLowerCase().includes("abort"));
+      const errorMessage = timedOut
+        ? t.inventory.addProductModal.imageSearchTimeout ||
+          "La recherche prend trop de temps. Veuillez réessayer."
+        : t.inventory.addProductModal.imageSearchError ||
+          "Erreur lors de la recherche d'image. Vous pouvez entrer l'URL manuellement dans le champ ci-dessous.";
       alert(errorMessage);
     } finally {
       if (isMountedRef.current) {
@@ -670,8 +858,9 @@ export default function AddProductModal(props: AddProductModalProps) {
     productPageUrl: string
   ): Promise<SaqProductDetails | null> => {
     try {
-      const proxyResponse = await fetch(
-        `${PUBLIC_SAQ_PROXY}${encodeURIComponent(productPageUrl)}`
+      const proxyResponse = await fetchWithTimeout(
+        `${PUBLIC_SAQ_PROXY}${encodeURIComponent(productPageUrl)}`,
+        { timeout: 10000 }
       );
       if (!proxyResponse.ok) {
         console.warn(
@@ -707,8 +896,9 @@ export default function AddProductModal(props: AddProductModalProps) {
     }
 
     try {
-      const response = await fetch(
-        `/api/saq-scrape?url=${encodeURIComponent(productPageUrl)}`
+      const response = await fetchWithTimeout(
+        `/api/saq-scrape?url=${encodeURIComponent(productPageUrl)}`,
+        { timeout: 12000 }
       );
       if (response.ok) {
         const raw = await response.text();
@@ -731,7 +921,11 @@ export default function AddProductModal(props: AddProductModalProps) {
         );
       }
     } catch (error) {
-      console.warn("[SAQ backend] Erreur réseau:", error);
+      if ((error as DOMException)?.name === "AbortError") {
+        console.warn("[SAQ backend] Request timed out");
+      } else {
+        console.warn("[SAQ backend] Erreur réseau:", error);
+      }
     }
 
     return fetchProductDetailsViaProxy(productPageUrl);
@@ -742,6 +936,7 @@ export default function AddProductModal(props: AddProductModalProps) {
     imageUrl: string;
     productPageUrl: string;
     title?: string;
+    thumbnailUrl?: string;
   }) => {
     setIsSearchingImage(true);
     try {
@@ -754,7 +949,7 @@ export default function AddProductModal(props: AddProductModalProps) {
       }
       
       const updates: Partial<typeof formData> = { 
-        imageUrl: result.imageUrl || "",
+        imageUrl: result.imageUrl || result.thumbnailUrl || "",
       };
       
       // Fill product name from title if available and name field is empty
@@ -886,7 +1081,10 @@ export default function AddProductModal(props: AddProductModalProps) {
         
         // Fill price
         if (details.price) {
-          updates.pricePerBottle = details.price.toString();
+          const formattedPrice = formatPriceValue(details.price);
+          if (formattedPrice) {
+            updates.pricePerBottle = formattedPrice;
+          }
         }
         
         // Fill bottle size in ml
@@ -963,12 +1161,13 @@ export default function AddProductModal(props: AddProductModalProps) {
       generateQRCode();
     }
 
+    const normalizedPrice = toStoredPrice(formData.pricePerBottle);
     const product: Product = {
       // Use the inventory code as ID (can be modified during edit)
       id: formData.inventoryCode || `product-${Date.now()}`,
       name: formData.name,
       category: mapCategoryToProductCategory(formData.category),
-      price: parseFloat(formData.pricePerBottle) || 0,
+      price: normalizedPrice,
       quantity: parseInt(formData.quantity) || 0,
       unit: editingProduct?.unit || "bottles",
       lastRestocked:
@@ -1019,7 +1218,6 @@ export default function AddProductModal(props: AddProductModalProps) {
     setSearchResults([]);
     setShowProductSelection(false);
     setCurrentPage(1);
-    setForceSAQSearch(true); // Reset to SAQ by default
     onClose();
   };
 
@@ -1066,12 +1264,13 @@ export default function AddProductModal(props: AddProductModalProps) {
       return matchName && matchCategory;
     });
     if (match) {
+      const formattedPrice = formatPriceValue(match.price);
       setFormData(prev => ({
         ...prev,
         name: match.name || prev.name,
         category: match.category || prev.category,
         origin: match.origin || prev.origin,
-        pricePerBottle: match.price ? match.price.toString() : prev.pricePerBottle,
+        pricePerBottle: formattedPrice || prev.pricePerBottle,
         bottleSizeInMl: match.format ? match.format.toString() : prev.bottleSizeInMl,
       }));
     }
@@ -1142,7 +1341,7 @@ export default function AddProductModal(props: AddProductModalProps) {
                   type="radio"
                   name="searchSource"
                   checked={forceSAQSearch === true}
-                  onChange={() => setForceSAQSearch(true)}
+                  onChange={() => handleSearchSourceChange(true)}
                   className="cursor-pointer"
                 />
                 <span className="text-sm font-medium">SAQ</span>
@@ -1152,7 +1351,7 @@ export default function AddProductModal(props: AddProductModalProps) {
                   type="radio"
                   name="searchSource"
                   checked={forceSAQSearch === false}
-                  onChange={() => setForceSAQSearch(false)}
+                  onChange={() => handleSearchSourceChange(false)}
                   className="cursor-pointer"
                 />
                 <span className="text-sm font-medium">Web</span>
@@ -1379,15 +1578,14 @@ export default function AddProductModal(props: AddProductModalProps) {
               id="pricePerBottle"
               name="pricePerBottle"
               type="text"
+              inputMode="decimal"
               autoComplete="transaction-amount"
-              step="0.01"
-              min="0"
-              value={formData.pricePerBottle ? `${formData.pricePerBottle}*` : ""}
-              onChange={(e) =>
-                handleInputChange("pricePerBottle", e.target.value.replace(/\*/g, ""))
-              }
+              pattern="[0-9]*[.,]?[0-9]{0,2}"
+              value={formData.pricePerBottle || ""}
+              onChange={(e) => handlePriceChange(e.target.value)}
+              onBlur={handlePriceBlur}
               placeholder="0.00"
-              title="* Prix restauration — référence S.A.Q. 2025-11-09"
+              title="Prix restauration — référence S.A.Q. 2025-11-09"
             />
           </div>
 
@@ -1530,53 +1728,55 @@ export default function AddProductModal(props: AddProductModalProps) {
         <div className="flex-1 overflow-y-auto pr-2">
           <div className="space-y-3 py-4">
               <>
-                {currentPageResults.map((result, index) => (
-                  <div
-                    key={startIndex + index}
-                    onClick={async () => {
-                      await applyProductResult(result);
-                    }}
-                    className="flex items-center gap-4 p-4 border-2 border-foreground/20 rounded-lg hover:border-primary/50 hover:bg-secondary/50 transition-all cursor-pointer"
-                  >
-                    {result.imageUrl && (
-                      <div className="w-24 h-24 rounded-lg overflow-hidden border-2 border-foreground/20 bg-secondary flex-shrink-0">
-                        <img
-                          src={result.imageUrl}
-                          alt={result.title}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                          (e.target as HTMLImageElement).style.display =
-                            "none";
-                          }}
-                        />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-base text-foreground line-clamp-2">
-                        {result.title}
-                      </h3>
-                      {result.snippet && (
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                          {result.snippet}
-                        </p>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-2 break-all">
-                        {result.productPageUrl}
-                      </p>
-                    </div>
-                    <Button
-                      onClick={async (e) => {
-                        e.stopPropagation();
+                {currentPageResults.map((result, index) => {
+                  const previewImage = result.imageUrl || result.thumbnailUrl;
+                  return (
+                    <div
+                      key={startIndex + index}
+                      onClick={async () => {
                         await applyProductResult(result);
-                        setShowProductSelection(false);
-                        setCurrentPage(1);
                       }}
-                      className="flex-shrink-0"
+                      className="flex items-center gap-4 p-4 border-2 border-foreground/20 rounded-lg hover:border-primary/50 hover:bg-secondary/50 transition-all cursor-pointer"
                     >
-                      Sélectionner
-                    </Button>
-                  </div>
-                ))}
+                      {previewImage && (
+                        <div className="w-24 h-24 rounded-lg overflow-hidden border-2 border-foreground/20 bg-secondary flex-shrink-0">
+                          <img
+                            src={previewImage}
+                            alt={result.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = "none";
+                            }}
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-base text-foreground line-clamp-2">
+                          {result.title}
+                        </h3>
+                        {result.snippet && (
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                            {result.snippet}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-2 break-all">
+                          {result.productPageUrl}
+                        </p>
+                      </div>
+                      <Button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await applyProductResult(result);
+                          setShowProductSelection(false);
+                          setCurrentPage(1);
+                        }}
+                        className="flex-shrink-0"
+                      >
+                        Sélectionner
+                      </Button>
+                    </div>
+                  );
+                })}
                 
                 {/* Pagination Controls */}
                 {totalPages > 1 && (
@@ -1640,3 +1840,4 @@ export default function AddProductModal(props: AddProductModalProps) {
     </>
   );
 }
+

@@ -53,7 +53,7 @@ export default function ImportCSVModal({ onImport, onClose }: ImportCSVModalProp
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => {
+      complete: (results: Papa.ParseResult<Record<string, unknown>>) => {
         const products: ImportedProduct[] = results.data
           .map((row: Record<string, any>) => {
             const name = getValue(row, ["nom", "nomduproduit", "produit", "name"]);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,7 +8,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -16,8 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Brain, ChevronRight, SkipForward } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Brain, ChevronRight } from "lucide-react";
 
 interface BarProfileSetupModalProps {
   isOpen: boolean;
@@ -32,6 +30,7 @@ export function BarProfileSetupModal({
 }: BarProfileSetupModalProps) {
   const [step, setStep] = useState(0);
   const [profile, setProfile] = useState({
+    hasRestaurantPriceList: "",
     barType: "",
     barAmbiance: "",
     primaryClientele: "",
@@ -44,7 +43,33 @@ export function BarProfileSetupModal({
     targetMarket: "",
   });
 
-  const steps = [
+  type StepDefinition = {
+    title: string;
+    description: string;
+    field: keyof typeof profile;
+    options?: { value: string; label: string }[];
+    isSelect?: boolean;
+    type?: string;
+    isInput?: boolean;
+    placeholder?: string;
+    optional?: boolean;
+    extraNote?: string;
+  };
+
+  const steps: StepDefinition[] = [
+    {
+      title: "Tarifs restaurateur",
+      description:
+        "Possédez-vous la liste CSV officielle des prix restauration (SAQ) pour vos produits?",
+      field: "hasRestaurantPriceList",
+      options: [
+        { value: "yes", label: "Oui, je l'ai déjà" },
+        { value: "no", label: "Pas encore" },
+      ],
+      isSelect: true,
+      extraNote:
+        "Si vous choisissez Oui, déposez le fichier dans public/Prix_Saq_restauration.csv pour activer l’auto-complétion des prix.",
+    },
     {
       title: "Type d'établissement",
       description: "Quel type de bar exploitez-vous ?",
@@ -273,6 +298,9 @@ export function BarProfileSetupModal({
             )}
             {currentStep.optional && (
               <p className="text-xs text-muted-foreground">Cette question est optionnelle</p>
+            )}
+            {currentStep.extraNote && (
+              <p className="text-xs text-muted-foreground">{currentStep.extraNote}</p>
             )}
           </div>
         </div>

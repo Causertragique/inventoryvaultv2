@@ -1,6 +1,6 @@
 import { Edit2, Trash2, Plus, Minus, FlipHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { usei18n } from "@/contexts/i18nContext";
+import { usei18n } from "@/contexts/I18nContext";
 import { useState, useMemo, useRef, useEffect } from "react";
 
 export interface Product {
@@ -29,14 +29,6 @@ interface ProductCardProps {
   canDelete?: boolean;
 }
 
-const categoryColors = {
-  spirits: "bg-slate-100 dark:bg-slate-500/20 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-500/30",
-  wine: "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 border-red-300 dark:border-red-500/30",
-  beer: "bg-red-100 dark:bg-red-900/20 text-red-900 dark:text-red-100 border-red-300 dark:border-red-900/30",
-  soda: "bg-cyan-100 dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border-cyan-300 dark:border-cyan-500/30",
-  juice: "bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-500/30",
-  other: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300 border-green-300 dark:border-green-500/30",
-};
 
 export default function ProductCard({
   product,

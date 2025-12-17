@@ -138,6 +138,7 @@ export default function Inventory() {
             unit: p.unit,
             origin: (p as any).origin,
             bottleSizeInMl: (p as any).bottleSizeInMl,
+            imageUrl: (p as any).imageUrl,
           }));
           setProducts(mapped);
         })

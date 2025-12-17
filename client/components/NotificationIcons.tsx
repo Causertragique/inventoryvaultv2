@@ -1,11 +1,10 @@
-import { AlertCircle, CheckCircle, Info, XCircle, Trash2, Plus, Edit2, Save, Bell } from "lucide-react";
+import { AlertCircle, CheckCircle, Info, Trash2, Plus, Edit2, Save, Bell } from "lucide-react";
 import { useNotificationStore } from "@/hooks/useNotificationStore";
 import {
-  tooltip,
-  tooltipContent,
-  tooltipProvider,
-  tooltipTrigger,
+  tooltipContent as TooltipContent,
+  tooltip as Tooltip
 } from "@/components/ui/tooltip";
+import { TooltipProvider, TooltipTrigger } from "@radix-ui/react-tooltip";
 
 export default function NotificationIcons() {
   const { notifications, removeNotification } = useNotificationStore();
@@ -33,7 +32,7 @@ export default function NotificationIcons() {
   };
 
   return (
-    <tooltipProvider>
+    <TooltipProvider>
       <div className="flex items-center gap-2 ml-2">
         {/* Bell icon - changes color based on notifications */}
         <div className="relative">
@@ -55,8 +54,8 @@ export default function NotificationIcons() {
               const color = getColorForVariant(notification.variant);
 
               return (
-                <tooltip key={notification.id}>
-                  <tooltipTrigger asChild>
+                <Tooltip key={notification.id}>
+                  <TooltipTrigger asChild>
                     <button
                       onClick={() => removeNotification(notification.id)}
                       className={`${color} transition-colors cursor-pointer`}
@@ -64,8 +63,8 @@ export default function NotificationIcons() {
                     >
                       <Icon className="h-4 w-4" />
                     </button>
-                  </tooltipTrigger>
-                  <tooltipContent>
+                  </TooltipTrigger>
+                  <TooltipContent>
                     <div className="text-sm">
                       <p className="font-semibold">{notification.title}</p>
                       {notification.description && (
@@ -74,13 +73,13 @@ export default function NotificationIcons() {
                         </p>
                       )}
                     </div>
-                  </tooltipContent>
-                </tooltip>
+                  </TooltipContent>
+                </Tooltip>
               );
             })}
           </div>
         )}
       </div>
-    </tooltipProvider>
+    </TooltipProvider>
   );
 }

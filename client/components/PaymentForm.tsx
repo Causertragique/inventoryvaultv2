@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { CreditCard, Apple, AlertCircle, Check, Terminal } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { usei18n } from "@/contexts/i18nContext";
+import { usei18n } from "@/contexts/I18nContext";
 import StripeTerminalPayment from "./StripeTerminalPayment";
 
 interface PaymentFormProps {
@@ -106,7 +106,7 @@ export default function PaymentForm({
     }
   };
 
-  const handleTerminalPaymentComplete = (paymentIntentId: string) => {
+  const handleTerminalPaymentComplete = () => {
     setSuccess(true);
     setTimeout(() => {
       onPaymentComplete();

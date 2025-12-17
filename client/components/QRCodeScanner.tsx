@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { X, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { usei18n } from "@/contexts/i18nContext";
+import { usei18n } from "@/contexts/I18nContext";
 
 interface QRCodeScannerProps {
   isOpen: boolean;
@@ -16,9 +16,9 @@ export default function QRCodeScanner({
   onClose,
   onScan,
 }: QRCodeScannerProps) {
-  const { t } = usei18n();
+  usei18n();
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
+  const [, setIsScanning] = useState(false);
   const [error, setError] = useState<string>("");
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
 
@@ -63,7 +63,7 @@ export default function QRCodeScanner({
           // Successfully scanned
           handleScanSuccess(decodedText);
         },
-        (errorMessage) => {
+        () => {
           // Scanning error (ignore, it's normal while scanning)
         }
       );
