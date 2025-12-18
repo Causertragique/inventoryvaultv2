@@ -198,7 +198,7 @@ export default function Layout({ children }: LayoutProps) {
         <main className="mx-auto w-full max-w-[1500px] flex-1 pb-20 px-4 py-6 sm:px-6 lg:px-10">
           {children}
         </main>
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 border-t bg-background/90 shadow-inner">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 border-t bg-background shadow-inner backdrop-blur z-50">
           <div className="mx-auto flex w-full max-w-[1500px] items-center justify-between px-4 sm:px-6 lg:px-10">
             {navItems.map((item) => {
               const ItemIcon = item.icon;

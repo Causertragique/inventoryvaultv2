@@ -24,7 +24,10 @@ dist-ssr
 *.sw?
 
 .config/
-!.env
+.env
+.env
+.env.local
+.env.*.local
 
 # Database
 data/

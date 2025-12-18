@@ -3,7 +3,7 @@ import Layout from "@/components/Layout";
 import PaymentModal from "@/components/PaymentModal";
 import AddProductModal from "@/components/AddProductModal";
 import { Product } from "@/components/ProductCard";
-import { Trash2, Plus, Minus, CreditCard, DollarSign, UserPlus, Users, X, FileText, Eye, Wine, Grid3x3, List, SlidersHorizontal, Edit3 } from "lucide-react";
+import { Trash2, Plus, Minus, CreditCard, DollarSign, UserPlus, Users, X, FileText, Eye, Wine, Grid3x3, List, Edit3 } from "lucide-react";
 import { usei18n } from "@/contexts/I18nContext";
 import { getCurrentUserRole, hasPermission } from "@/lib/permissions";
 import { useAuth } from "@/hooks/useAuth";
@@ -300,10 +300,6 @@ export default function Sales() {
     [inventoryProducts, servingOverrides]
   );
 
-  const openServingConfig = () => {
-    setDraftOverrides(JSON.parse(JSON.stringify(servingOverrides || {})));
-    setShowServingConfigDialog(true);
-  };
 
   const handleMarginDraftChange = (category: BaseCategory, formatId: string, value: number) => {
     setDraftOverrides((prev) => {
@@ -1328,13 +1324,6 @@ export default function Sales() {
               <Wine className="h-4 w-4 sm:h-5 sm:w-5" />
               + Produits (cocktail, au verres etc...)
             </button>
-            <button
-              onClick={openServingConfig}
-              className="flex items-center gap-2 px-3 sm:px-4 py-2 border-2 border-foreground/20 rounded-lg text-sm sm:text-base font-medium hover:border-primary hover:text-primary transition-colors"
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              Formats & marges
-            </button>
             {tabsEnabled && openTabs.length > 0 && (
               <button
                 onClick={() => setShowTabsManagement(true)}
@@ -1495,12 +1484,12 @@ export default function Sales() {
                             : containerLabel || "\u00A0"}
                         </p>
                       </div>
-                      <div className="flex flex-col items-end gap-0.5 text-sm">
-                        <span className="font-semibold text-base sm:text-lg text-foreground">
-                          ${product.price.toFixed(2)}
-                        </span>
+                      <div className="flex h-full flex-col items-end justify-between text-sm">
                         <span className="text-[10px] opacity-70">
                           {availabilityText}
+                        </span>
+                        <span className="font-semibold text-base sm:text-lg text-foreground">
+                          ${product.price.toFixed(2)}
                         </span>
                       </div>
                     </div>
