@@ -11,9 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { updateProduct, getProducts } from "@/services/firestore/products";
 import { createRecipe, getRecipes } from "@/services/firestore/recipes";
 import { createSale } from "@/services/firestore/sales";
-import { createTabRecord, fetchOpenTabs, updateTabRecord } from "@/services/firestore/tabs";
 import { stockAlertsService } from "@/services/firestore/notifications";
-import type { FirestoreProduct, FirestoreTab } from "@shared/firestore-schema";
+import type { FirestoreProduct } from "@shared/firestore-schema";
 import {
   Dialog,
   DialogContent,
@@ -429,30 +428,6 @@ export default function Sales() {
     };
 
     loadRecipes();
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.uid]);
-
-  useEffect(() => {
-    if (!user?.uid) {
-      setOpenTabs([]);
-      return;
-    }
-
-    let isMounted = true;
-
-    const loadTabs = async () => {
-      try {
-        const tabs = await fetchOpenTabs(user.uid);
-        if (!isMounted) return;
-        setOpenTabs(tabs);
-      } catch (error) {
-        console.error("[Sales] Échec du chargement des comptes :", error);
-      }
-    };
-
-    loadTabs();
     return () => {
       isMounted = false;
     };
@@ -1179,17 +1154,9 @@ export default function Sales() {
     }
   };
 
-  const handleCreateNewTab = async () => {
+  const handleCreateNewTab = () => {
     if (!newTabName.trim()) {
       alert("Veuillez entrer un nom de compte");
-      return;
-    }
-    if (!user?.uid) {
-      toast({
-        title: "Action impossible",
-        description: "Connectez-vous pour ouvrir un compte.",
-        variant: "destructive",
-      });
       return;
     }
     
@@ -1205,47 +1172,27 @@ export default function Sales() {
       last4Digits = cleanedCard.slice(-4);
     }
     
-    const tabItems = cart.map((item) => ({
-      id: item.id,
-      name: item.name,
-      category: item.category,
-      price: item.price,
-      cartQuantity: item.cartQuantity,
-      isRecipe: item.isRecipe,
-      userId: item.userId,
-    }));
-    
-    const payload: Omit<FirestoreTab, "id" | "createdAt" | "updatedAt"> = {
+    const newTab: Tab = {
+      id: `tab-${Date.now()}`,
       name: newTabName.trim(),
       creditCard: last4Digits,
-      items: tabItems,
+      items: [...cart],
+      createdAt: new Date(),
       subtotal,
       tax,
       total,
-      status: "open",
+      status: "open", // New tabs are open
     };
     
-    try {
-      const createdTab = await createTabRecord(user.uid, payload);
-      setOpenTabs((prevTabs) => [...prevTabs, createdTab as Tab]);
-      setSelectedTabId(createdTab.id);
-      alert(`${t.sales.tabCreated}: ${createdTab.name}`);
-      setCart([]);
-      setPaymentMethod(null);
-      setNewTabName("");
-      setNewTabCreditCard("");
-      setShowNewTabDialog(false);
-    } catch (error) {
-      console.error("[Sales] Echec de creation de compte :", error);
-      toast({
-        title: "Erreur",
-        description: "Impossible d'ouvrir le compte. Reessayez.",
-        variant: "destructive",
-      });
-    }
+    setOpenTabs([...openTabs, newTab]);
+    setSelectedTabId(newTab.id);
+    alert(`${t.sales.tabCreated}: ${newTab.name}`);
+    setCart([]);
+    setPaymentMethod(null);
+    setNewTabName("");
+    setNewTabCreditCard("");
+    setShowNewTabDialog(false);
   };
-
-
 
   const handlePayTab = (tabId: string) => {
     const tab = openTabs.find(t => t.id === tabId);
@@ -1389,7 +1336,7 @@ export default function Sales() {
               <SlidersHorizontal className="h-4 w-4" />
               Formats & marges
             </button>
-            {openTabs.length > 0 && (
+            {tabsEnabled && openTabs.length > 0 && (
               <button
                 onClick={() => setShowTabsManagement(true)}
                 className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-900 text-white rounded-lg hover:bg-red-800 transition-colors font-medium text-sm sm:text-base"
@@ -1727,7 +1674,7 @@ export default function Sales() {
                   <p className="text-xs font-medium text-muted-foreground uppercase">
                     {t.sales.paymentMethod}
                   </p>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className={`grid ${tabsEnabled ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
                     <button
                       onClick={() => setPaymentMethod("cash")}
                       className={`flex items-center justify-center gap-2 py-2 rounded-lg transition-colors font-medium text-sm ${
@@ -1750,26 +1697,28 @@ export default function Sales() {
                       <CreditCard className="h-4 w-4" />
                       {t.sales.card}
                     </button>
-                    <button
-                      onClick={() => {
-                        setPaymentMethod("tab");
-                        if (openTabs.length > 0 && !selectedTabId) {
-                          setShowTabsList(true);
-                        }
-                      }}
-                      className={`flex items-center justify-center gap-2 py-2 rounded-lg transition-colors font-medium text-sm ${
-                        paymentMethod === "tab"
-                          ? "bg-red-900 text-white"
-                          : "bg-secondary text-foreground hover:bg-secondary/80"
-                      }`}
-                    >
-                      <UserPlus className="h-4 w-4" />
-                      {t.sales.tab}
-                    </button>
+                    {tabsEnabled && (
+                      <button
+                        onClick={() => {
+                          setPaymentMethod("tab");
+                          if (openTabs.length > 0 && !selectedTabId) {
+                            setShowTabsList(true);
+                          }
+                        }}
+                        className={`flex items-center justify-center gap-2 py-2 rounded-lg transition-colors font-medium text-sm ${
+                          paymentMethod === "tab"
+                            ? "bg-red-900 text-white"
+                            : "bg-secondary text-foreground hover:bg-secondary/80"
+                        }`}
+                      >
+                        <UserPlus className="h-4 w-4" />
+                        {t.sales.tab}
+                      </button>
+                    )}
                   </div>
                   
                   {/* Tab Selection */}
-                  {paymentMethod === "tab" && (
+                  {tabsEnabled && paymentMethod === "tab" && (
                     <div className="space-y-2 mt-2">
                       {selectedTabId ? (
                         <div className="flex items-center justify-between p-2 bg-red-900/10 border border-red-900/30 rounded">
@@ -1797,22 +1746,6 @@ export default function Sales() {
                 </div>
               )}
 
-              {/* Open Tab Button */}
-              <button
-                onClick={() => {
-                  if (cart.length === 0) {
-                    alert("Veuillez d'abord ajouter des articles au panier");
-                    return;
-                  }
-                  setShowNewTabDialog(true);
-                }}
-                disabled={cart.length === 0}
-                className="w-full py-3 bg-red-900 text-white rounded-lg font-bold transition-all hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                <UserPlus className="h-4 w-4" />
-                {t.sales.openTab}
-              </button>
-
               {/* Checkout Button */}
               <button
                 onClick={handleCheckout}
@@ -1823,7 +1756,7 @@ export default function Sales() {
               </button>
 
               {/* Pay Tab Button - Quick Access */}
-              {openTabs.length > 0 && (
+              {tabsEnabled && openTabs.length > 0 && (
                 <button
                   onClick={() => setShowPayTabDialog(true)}
                   className="w-full py-3 bg-red-900 text-white rounded-lg font-bold transition-all hover:bg-red-800 flex items-center justify-center gap-2"
