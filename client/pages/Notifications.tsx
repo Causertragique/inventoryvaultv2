@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { useAuth } from "@/hooks/useAuth";
-import { usei18n } from "@/contexts/i18nContext";
+import { usei18n } from "@/contexts/I18nContext";
 import {
   Dialog,
   DialogContent,
@@ -41,19 +41,9 @@ import {
   Calendar,
 } from "lucide-react";
 
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  type: "stock_alert" | "reminder" | "info";
-  createdAt: Date;
-  read: boolean;
-  priority?: "low" | "medium" | "high";
-  scheduledFor?: Date;
-}
 
 export default function Notifications() {
-  const { t } = usei18n();
+  usei18n();
   const { user } = useAuth();
   const location = useLocation();
 
@@ -601,3 +591,5 @@ export default function Notifications() {
     </Layout>
   );
 }
+/* setLoading is now handled by useState above */
+

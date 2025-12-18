@@ -165,6 +165,7 @@ export interface FirestoreRecipe {
   id?: string;
   name: string;
   category: "cocktail" | "mocktail";
+  price?: number;
   subcategory?: string;
   ingredients: {
     productId?: string;
@@ -178,6 +179,9 @@ export interface FirestoreRecipe {
   imageUrl?: string;
   prepTime?: number; // minutes
   difficulty?: "facile" | "moyen" | "difficile";
+  containerLabel?: string;
+  displayName?: string;
+  servingSize?: number;
   userId: string;
   createdAt?: any;
   updatedAt?: any;

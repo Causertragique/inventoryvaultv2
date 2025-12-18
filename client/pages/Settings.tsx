@@ -46,7 +46,7 @@ import {
   Trash2,
   FileDown,
 } from "lucide-react";
-import { usei18n } from "@/contexts/i18nContext";
+import { usei18n } from "@/contexts/I18nContext";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { db, auth, isFirebaseConfigured } from "@/lib/firebase";
@@ -1101,7 +1101,6 @@ export default function Settings() {
                     </SelectTrigger>
                     <SelectContent>
                       {(() => {
-                        const availableRegions = getTaxRegionsByCurrency(settings.currency);
                         const allRegions = [
                           { value: "quebec", label: t.settings.general.taxRegions.quebec },
                           { value: "ontario", label: t.settings.general.taxRegions.ontario },

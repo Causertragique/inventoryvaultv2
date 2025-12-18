@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import Layout from "@/components/Layout";
 import PaymentModal from "@/components/PaymentModal";
+import AddProductModal from "@/components/AddProductModal";
 import { Product } from "@/components/ProductCard";
-import { Trash2, Plus, Minus, CreditCard, DollarSign, UserPlus, Users, X, FileText, Eye, Wine, Grid3x3, List, Search, SlidersHorizontal, Edit3 } from "lucide-react";
+import { Trash2, Plus, Minus, CreditCard, DollarSign, UserPlus, Users, X, FileText, Eye, Wine, Grid3x3, List, SlidersHorizontal, Edit3 } from "lucide-react";
 import { usei18n } from "@/contexts/I18nContext";
 import { getCurrentUserRole, hasPermission } from "@/lib/permissions";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,6 +39,11 @@ interface RecipeIngredient {
   sourceMissing?: boolean;
 }
 
+interface CustomIngredientRow extends RecipeIngredient {
+  rowId: string;
+  referenceName?: string;
+}
+
 interface Recipe {
   id: string;
   name: string;
@@ -45,6 +51,9 @@ interface Recipe {
   ingredients: RecipeIngredient[];
   category: "spirits" | "wine" | "beer" | "soda" | "juice" | "other" | "cocktail";
   servingSize?: number; // Size of one serving in ml (optional)
+  containerLabel?: string;
+  displayName?: string;
+  saleType?: ProductTypeOption;
 }
 
 interface Tab {
@@ -225,6 +234,8 @@ const buildServingItems = (
         return {
           id: `${product.id}__${format.id}`,
           name: `${product.name} (${format.label})`,
+          displayName: product.name,
+          containerLabel: format.label,
           price: finalPrice,
           ingredients: [
             {
@@ -273,9 +284,11 @@ export default function Sales() {
     const saved = localStorage.getItem("sales-view-mode");
     return (saved === "list" || saved === "grid") ? saved : "grid";
   });
-  const [showRecipeDialog, setShowRecipeDialog] = useState(false);
+  const [showSellProductForm, setShowSellProductForm] = useState(false);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [inventoryProducts, setInventoryProducts] = useState<Product[]>([]);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [] = useState(true);
   const [tip, setTip] = useState(0);
   const [tipPercentage, setTipPercentage] = useState<number | null>(null);
@@ -376,24 +389,36 @@ export default function Sales() {
         const firestoreRecipes = await getRecipes(user.uid);
         if (!isMounted) return;
 
-        const normalized: Recipe[] = firestoreRecipes.map((firestoreRecipe) => ({
-          id:
-            firestoreRecipe.id ||
-            `${firestoreRecipe.name}-${Math.random().toString(36).slice(2, 8)}`,
-          name: firestoreRecipe.name,
-          price:
-            typeof (firestoreRecipe as any).price === "number"
-              ? (firestoreRecipe as any).price
-              : 0,
-          ingredients: (firestoreRecipe.ingredients || []).map((ingredient) => ({
-            productId: ingredient.productId,
-            productName: ingredient.productName,
-            quantity: ingredient.quantity,
-            unit: ingredient.unit,
-          })),
-          category:
-            firestoreRecipe.category === "cocktail" ? "cocktail" : "other",
-        }));
+        const normalized: Recipe[] = firestoreRecipes.map((firestoreRecipe) => {
+          const category = VALID_SALE_CATEGORIES.includes(firestoreRecipe.category as Recipe["category"])
+            ? (firestoreRecipe.category as Recipe["category"])
+            : "other";
+          const name = firestoreRecipe.name || "Produit de vente";
+          return {
+            id:
+              firestoreRecipe.id ||
+              `${name}-${Math.random().toString(36).slice(2, 8)}`,
+            name,
+            price:
+              typeof firestoreRecipe.price === "number"
+                ? firestoreRecipe.price
+                : 0,
+            ingredients: (firestoreRecipe.ingredients || []).map((ingredient) => ({
+              productId: ingredient.productId,
+              productName: ingredient.productName,
+              quantity: ingredient.quantity,
+              unit: ingredient.unit,
+            })),
+            category,
+            servingSize:
+              typeof firestoreRecipe.servingSize === "number"
+                ? firestoreRecipe.servingSize
+                : undefined,
+            containerLabel: firestoreRecipe.containerLabel,
+            displayName: firestoreRecipe.displayName || name,
+            saleType: (firestoreRecipe as any).saleType || undefined,
+          };
+        });
 
         setRecipes(normalized);
       } catch (error) {
@@ -555,7 +580,7 @@ export default function Sales() {
     return inventoryProducts.find((p) => p.id === primaryIngredient.productId) || null;
   };
 
-  const handleEditProduct = async (product: Product) => {
+  const handleEditProduct = (product: Product) => {
     if (!canEditProducts) return;
     if (!user?.uid) {
       toast({
@@ -565,37 +590,39 @@ export default function Sales() {
       });
       return;
     }
+    setEditingProduct(product);
+    setIsProductModalOpen(true);
+  };
 
-    const input = window.prompt(
-      `Nouveau prix pour ${product.name} (en dollars)`,
-      product.price.toFixed(2),
-    );
-    if (input === null) return;
-    const value = parseFloat(input.replace(",", "."));
-    if (Number.isNaN(value) || value < 0) {
-      toast({
-        title: "Valeur invalide",
-        description: "Entrez un prix numérique valide.",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const handleProductModalSave = async (updatedProduct: Product) => {
+    if (!user?.uid || !editingProduct) return;
     try {
-      await updateProduct(user.uid, product.id, { price: value });
-      const updated = inventoryProducts.map((p) =>
-        p.id === product.id ? { ...p, price: value } : p,
+      const { id: _id, ...productWithoutId } = updatedProduct;
+      await updateProduct(
+        user.uid,
+        editingProduct.id,
+        productWithoutId as Partial<FirestoreProduct>,
+        { overwrite: true },
+      );
+      const normalized = mapFirestoreProductToSaleProduct({
+        id: editingProduct.id,
+        ...productWithoutId,
+      } as FirestoreProduct);
+      const updated = inventoryProducts.map((item) =>
+        item.id === editingProduct.id ? normalized : item,
       );
       setInventoryProducts(updated);
       persistInventoryProducts(updated);
       setCart((previous) =>
         previous.map((item) =>
-          item.id === product.id ? { ...item, price: value } : item,
+          item.id === editingProduct.id ? { ...item, price: normalized.price } : item,
         ),
       );
+      setEditingProduct(null);
+      setIsProductModalOpen(false);
       toast({
-        title: "Produit mis à jour",
-        description: `${product.name} est maintenant à $${value.toFixed(2)}`,
+        title: "Produit modifié",
+        description: `${updatedProduct.name} a bien été mis à jour.`,
       });
     } catch (error) {
       console.error("[Sales] Échec mise à jour produit:", error);
@@ -607,6 +634,52 @@ export default function Sales() {
     }
   };
 
+  const handleProductModalClose = () => {
+    setIsProductModalOpen(false);
+    setEditingProduct(null);
+  };
+
+  const handleSellProductSave = async (recipe: Recipe) => {
+    if (!user?.uid) {
+      toast({
+        title: "Action impossible",
+        description: "Connectez-vous pour enregistrer ce produit.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      const payload: Record<string, unknown> = {
+        name: recipe.name,
+        category: recipe.category,
+        ingredients: recipe.ingredients,
+        instructions: [],
+        userId: user.uid,
+        price: recipe.price,
+        servingSize: recipe.servingSize,
+      displayName: recipe.displayName || recipe.name,
+      saleType: recipe.saleType,
+    };
+      if (recipe.containerLabel) {
+        payload.containerLabel = recipe.containerLabel;
+      }
+      await createRecipe(user.uid, payload as any);
+      setRecipes((prev) => [...prev, recipe]);
+      addToCart(recipe);
+      setShowSellProductForm(false);
+      toast({
+        title: "Produit enregistré",
+        description: `${recipe.name} est prêt à la vente.`,
+      });
+    } catch (error) {
+      console.error("[Sales] Échec enregistrement produit :", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible d'enregistrer le produit.",
+        variant: "destructive",
+      });
+    }
+  };
   const handleDeleteProduct = async (product: Product) => {
     if (!canDeleteProducts) return;
     if (!user?.uid) {
@@ -625,7 +698,12 @@ export default function Sales() {
       return;
 
     try {
-      await updateProduct(user.uid, product.id, { availableForSale: false });
+      await updateProduct(
+        user.uid,
+        product.id,
+        { availableForSale: false },
+        { overwrite: true },
+      );
       const updated = inventoryProducts.map((p) =>
         p.id === product.id ? { ...p, availableForSale: false } : p,
       );
@@ -650,7 +728,7 @@ export default function Sales() {
     const editableProduct = getEditableInventoryProduct(item);
     if (!editableProduct || (!canEditProducts && !canDeleteProducts)) return null;
     return (
-      <div className="absolute right-2 top-2 z-10 flex gap-1">
+      <div className="absolute right-2 top-2 z-10 flex gap-1 text-muted-foreground">
         {canEditProducts && (
           <button
             type="button"
@@ -658,7 +736,7 @@ export default function Sales() {
               event.stopPropagation();
               handleEditProduct(editableProduct);
             }}
-            className="h-7 w-7 rounded-full border border-foreground/20 bg-background/70 text-muted-foreground hover:text-foreground hover:border-foreground transition-colors"
+            className="h-7 w-7 rounded text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center bg-transparent border-0"
             aria-label={`Modifier ${editableProduct.name}`}
           >
             <Edit3 className="h-4 w-4" />
@@ -671,7 +749,7 @@ export default function Sales() {
               event.stopPropagation();
               handleDeleteProduct(editableProduct);
             }}
-            className="h-7 w-7 rounded-full border border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+            className="h-7 w-7 rounded text-destructive hover:text-destructive/80 transition-colors flex items-center justify-center bg-transparent border-0"
             aria-label={`Supprimer ${editableProduct.name}`}
           >
             <Trash2 className="h-4 w-4" />
@@ -1206,7 +1284,7 @@ export default function Sales() {
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Dropdown de sélection de cocktail supprimé (désormais uniquement dans RecipeForm) */}
+        {/* Dropdown de sélection de cocktail */}
         {/* Page Header */}
         <div className="space-y-3 sm:space-y-4">
           <div>
@@ -1244,7 +1322,7 @@ export default function Sales() {
               </button>
             </div>
             <button
-              onClick={() => setShowRecipeDialog(true)}
+              onClick={() => setShowSellProductForm(true)}
               className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-primary text-primary-foreground rounded-lg font-bold transition-all hover:opacity-90 whitespace-nowrap text-sm sm:text-base"
             >
               <Wine className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -1316,29 +1394,54 @@ export default function Sales() {
                     ? calculateRecipeAvailability(product as Recipe)
                     : (product as Product).quantity;
                   
+                  const isOutOfStock = availableQuantity <= 0;
+                  const title =
+                    ('displayName' in product && product.displayName)
+                      ? product.displayName
+                      : product.name;
+                  const containerLabel = ('containerLabel' in product && product.containerLabel)
+                    ? product.containerLabel
+                    : !isRecipe
+                    ? translateUnit((product as Product).unit)
+                    : "";
+                  const availabilityText = isOutOfStock ? "Indisponible" : "\u00A0";
                   return (
-                    <button
+                    <div
                       key={product.id}
-                      onClick={() => addToCart(product)}
-                      disabled={availableQuantity <= 0}
-                      className={`relative p-3 rounded-lg border-2 border-foreground/30 transition-all text-left hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex flex-col h-full min-h-[120px] ${categoryColors[product.category]}`}
+                      role="button"
+                      tabIndex={isOutOfStock ? -1 : 0}
+                      aria-disabled={isOutOfStock}
+                      onClick={() => !isOutOfStock && addToCart(product)}
+                      onKeyDown={(event) => {
+                        if (
+                          isOutOfStock ||
+                          (event.key !== "Enter" && event.key !== " ")
+                        )
+                          return;
+                        event.preventDefault();
+                        addToCart(product);
+                      }}
+                      className={`relative p-3 rounded-lg border-2 border-foreground/30 transition-all text-left flex flex-col h-full min-h-[120px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${categoryColors[product.category]} ${
+                        isOutOfStock ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                      }`}
                     >
                       {renderProductActionIcons(product)}
-                      <p className="font-bold text-base line-clamp-2 min-h-[2.5rem] mb-2">
-                        {product.name}
+                      <p className="font-bold text-base leading-snug line-clamp-2 mb-1 min-h-[2.1rem]">
+                        {title}
                       </p>
-                      <div className="mt-auto">
-                        <p className="text-sm font-medium text-muted-foreground">
-                          ${product.price.toFixed(2)}
-                        </p>
-                        <p className="text-[10px] opacity-60 mt-0.5">
-                          {!isRecipe 
-                            ? `${translateUnit((product as Product).unit)} - Stock: ${availableQuantity}`
-                            : `Recette - Disponible: ${availableQuantity > 0 ? "Oui" : "Non"}`
-                          }
-                        </p>
-                      </div>
-                    </button>
+                  <p className="text-sm text-muted-foreground min-h-[1.2rem]">
+                    {(product as Recipe).saleType === "shot"
+                      ? "Shot"
+                      : containerLabel || "\u00A0"}
+                  </p>
+                      <div className="h-2" aria-hidden="true" />
+                      <p className="text-lg font-semibold text-foreground">
+                        ${product.price.toFixed(2)}
+                      </p>
+                      <p className="text-[10px] opacity-60 mt-1">
+                        {availabilityText}
+                      </p>
+                    </div>
                   );
                 })}
               </div>
@@ -1350,31 +1453,56 @@ export default function Sales() {
                     ? calculateRecipeAvailability(product as Recipe)
                     : (product as Product).quantity;
                   
+                  const isOutOfStock = availableQuantity <= 0;
+                  const title =
+                    ('displayName' in product && product.displayName)
+                      ? product.displayName
+                      : product.name;
+                  const containerLabel = ('containerLabel' in product && product.containerLabel)
+                    ? product.containerLabel
+                    : !isRecipe
+                    ? translateUnit((product as Product).unit)
+                    : "";
+                  const availabilityText = isOutOfStock ? "Indisponible" : "\u00A0";
                   return (
-                    <button
+                    <div
                       key={product.id}
-                      onClick={() => addToCart(product)}
-                      disabled={availableQuantity <= 0}
-                      className={`relative w-full p-3 sm:p-4 rounded-lg border-2 border-foreground/30 transition-all text-left hover:border-primary/50 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3 sm:gap-4 ${categoryColors[product.category]}`}
+                      role="button"
+                      tabIndex={isOutOfStock ? -1 : 0}
+                      aria-disabled={isOutOfStock}
+                      onClick={() => !isOutOfStock && addToCart(product)}
+                      onKeyDown={(event) => {
+                        if (
+                          isOutOfStock ||
+                          (event.key !== "Enter" && event.key !== " ")
+                        )
+                          return;
+                        event.preventDefault();
+                        addToCart(product);
+                      }}
+                      className={`relative w-full p-3 sm:p-4 rounded-lg border-2 border-foreground/30 transition-all text-left flex flex-col gap-2 ${categoryColors[product.category]} ${
+                        isOutOfStock ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                      }`}
                     >
                       {renderProductActionIcons(product)}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-sm sm:text-base line-clamp-1 mb-1">
-                          {product.name}
+                      <div className="flex flex-col gap-1 min-h-[3rem]">
+                        <p className="font-bold text-sm sm:text-base line-clamp-1">
+                          {title}
                         </p>
-                        <div className="flex items-center gap-3 sm:gap-4 text-sm">
-                          <p className="font-semibold text-foreground">
-                            ${product.price.toFixed(2)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {!isRecipe 
-                              ? `${translateUnit((product as Product).unit)} - Stock: ${availableQuantity}`
-                              : `Recette - Disponible: ${availableQuantity > 0 ? "Oui" : "Non"}`
-                            }
-                          </p>
-                        </div>
+                        <p className="text-xs text-muted-foreground min-h-[1rem]">
+                          {(product as Recipe).saleType === "shot"
+                            ? "Shot"
+                            : containerLabel || "\u00A0"}
+                        </p>
                       </div>
-                    </button>
+                      <div className="h-2" aria-hidden="true" />
+                      <div className="flex items-center justify-between text-sm">
+                        <p className="font-semibold text-foreground text-base">
+                          ${product.price.toFixed(2)}
+                        </p>
+                        <p className="text-[10px] opacity-60">{availabilityText}</p>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
@@ -2114,60 +2242,26 @@ export default function Sales() {
         </DialogContent>
       </Dialog>
 
-      {/* Recipe Creation Dialog */}
-      <Dialog open={showRecipeDialog} onOpenChange={setShowRecipeDialog}>
-        <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto p-4">
-          <DialogHeader className="pb-2">
+      <Dialog open={showSellProductForm} onOpenChange={setShowSellProductForm}>
+        <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto p-4 space-y-4">
+          <DialogHeader className="pb-0">
             <DialogTitle className="flex items-center gap-2 text-lg">
               <Wine className="h-5 w-5" />
-              Créer un produit
+              Ajouter un produit à la vente
             </DialogTitle>
-            <DialogDescription className="text-xs">
-              Sélectionnez le type, la catégorie, les ingrédients et le prix
+            <DialogDescription className="text-xs text-muted-foreground">
+              Étapes 1 à 3 : type, contenant, produit. Les prix sont enregistrés à la base de données.
             </DialogDescription>
           </DialogHeader>
-          {/* Formulaire de création de recette */}
-      <RecipeForm
-        inventoryProducts={inventoryProducts}
-        recipes={recipes}
-            onSave={async (recipe) => {
-              try {
-                // Sauvegarder la recette dans Firestore
-                if (user?.uid) {
-                  // Map local category to Firestore schema (cocktail or mocktail)
-                  const firestoreCategory: "cocktail" | "mocktail" = 
-                    recipe.category === "other" ? "mocktail" : "cocktail";
-                  await createRecipe(user.uid, {
-                    name: recipe.name,
-                    category: firestoreCategory,
-                    ingredients: recipe.ingredients,
-                    instructions: [],
-                    userId: user.uid,
-                  });
-                  setRecipes([...recipes, recipe]);
-                  setShowRecipeDialog(false);
-                  toast({
-                    title: "Produit créé",
-                    description: `${recipe.name} a été ajouté avec succès`,
-                  });
-                } else {
-                  throw new Error("Utilisateur non authentifié");
-                }
-              } catch (error) {
-                console.error("Erreur lors de la création du produit:", error);
-                toast({
-                  title: "Erreur",
-                  description: "Impossible de créer le produit",
-                  variant: "destructive",
-                });
-              }
-            }}
-        onCancel={() => setShowRecipeDialog(false)}
-      />
-      {/* Dropdown cocktail affiché en dehors du render dynamique, à synchroniser avec la catégorie du RecipeForm */}
-      {/* À faire : lever l'état de la catégorie dans Sales et le passer à RecipeForm pour afficher le dropdown au bon moment */}
-    </DialogContent>
-  </Dialog>
+          <SellProductForm
+            inventoryProducts={inventoryProducts}
+            isOpen={showSellProductForm}
+            onSave={handleSellProductSave}
+            onCancel={() => setShowSellProductForm(false)}
+            translateUnit={translateUnit}
+          />
+        </DialogContent>
+      </Dialog>
       <Dialog open={showServingConfigDialog} onOpenChange={setShowServingConfigDialog}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
@@ -2231,20 +2325,18 @@ export default function Sales() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <AddProductModal
+        isOpen={isProductModalOpen && canEditProducts}
+        onClose={handleProductModalClose}
+        onSave={handleProductModalSave}
+        editingProduct={editingProduct}
+      />
     {/* End of all dialogs */}
   </Layout>
 );
 }
 
 // Convert ounces to ml (1 oz = 29.5735 ml) - Utility function
-
-// Recipe Form Component
-interface RecipeFormProps {
-  inventoryProducts: Product[];
-  recipes: Recipe[];
-  onSave: (recipe: Recipe) => void;
-  onCancel: () => void;
-}
 
 // Recettes traditionnelles préétablies
 const PRESET_RECIPES: Partial<Recipe>[] = [
@@ -2388,6 +2480,7 @@ const CONTAINER_OPTIONS: Partial<Record<ProductTypeOption, ContainerOption[]>> =
   ],
 };
 
+
 const getContainerLabel = (
   type: ProductTypeOption | "",
   value: string,
@@ -2486,731 +2579,649 @@ const filterProductsForType = (
 const isProductTypeOption = (value: ProductTypeOption | ""): value is ProductTypeOption =>
   value !== "";
 
-function RecipeForm({ inventoryProducts, recipes: _recipes, onSave, onCancel }: RecipeFormProps): JSX.Element {
-  const { t } = usei18n();
-  const [productType, setProductType] = useState<ProductTypeOption | "">("");
+const VALID_SALE_CATEGORIES: Recipe["category"][] = [
+  "spirits",
+  "wine",
+  "beer",
+  "soda",
+  "juice",
+  "other",
+  "cocktail",
+];
+
+const typeRequiresContainerSelection = (type: ProductTypeOption | "") =>
+  Boolean(type && (CONTAINER_OPTIONS[type]?.length ?? 0));
+
+
+interface SellProductFormProps {
+  inventoryProducts: Product[];
+  isOpen: boolean;
+  onSave: (recipe: Recipe) => void;
+  onCancel: () => void;
+  translateUnit: (unit: string) => string;
+}
+
+function SellProductForm({
+  inventoryProducts,
+  isOpen,
+  onSave,
+  onCancel,
+  translateUnit,
+}: SellProductFormProps): JSX.Element {
+  const [step, setStep] = useState(1);
+  const [selectedType, setSelectedType] = useState<ProductTypeOption | "">("");
   const [selectedContainer, setSelectedContainer] = useState("");
-  const [selectedDefaultRecipe, setSelectedDefaultRecipe] = useState("");
-  const [ingredients, setIngredients] = useState<RecipeIngredient[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState("");
-  const [ingredientQuantity, setIngredientQuantity] = useState("");
-  const [ingredientUnit, setIngredientUnit] = useState("ml");
-  const [editingIngredientIndex, setEditingIngredientIndex] = useState<number | null>(null);
-  const [associationDialogOpen, setAssociationDialogOpen] = useState(false);
-  const [associationSearchQuery, setAssociationSearchQuery] = useState("");
-  const [profitMargin, setProfitMargin] = useState("40");
-  const [recipePrice, setRecipePrice] = useState("");
+  const [priceInput, setPriceInput] = useState("");
+  const [profitMargin, setProfitMargin] = useState(40);
+  const [customIngredients, setCustomIngredients] = useState<CustomIngredientRow[]>([]);
+  const [customCocktailName, setCustomCocktailName] = useState("");
+  const [selectedPresetRecipeName, setSelectedPresetRecipeName] = useState("");
+  const isCustomCocktail =
+    selectedType === "cocktail" && selectedContainer === "cocktail-custom";
+  const isPresetCocktail =
+    selectedType === "cocktail" && selectedContainer === "cocktail-default-recipe";
+  const isMultiIngredientCocktail = isCustomCocktail || isPresetCocktail;
 
-  // Add inventory product as ingredient
-
-  if (!inventoryProducts || !onSave || !onCancel) {
-    return <div />;
-  }
-
-  const requiresContainer =
-    isProductTypeOption(productType) && !!CONTAINER_OPTIONS[productType];
-  const isCocktailDefault = productType === "cocktail" && selectedContainer === "cocktail-default-recipe";
-  const shouldShowFullCocktailInventory = productType === "cocktail" && !isCocktailDefault;
-  const filteredInventoryProducts = useMemo(
-    () =>
-      filterProductsForType(productType, inventoryProducts, {
-        allowFullInventoryForCocktail: shouldShowFullCocktailInventory,
-      }),
-    [productType, inventoryProducts, shouldShowFullCocktailInventory],
+  const containerOptions = isProductTypeOption(selectedType)
+    ? CONTAINER_OPTIONS[selectedType]
+    : undefined;
+  const filteredInventory = useMemo(() => {
+    return filterProductsForType(selectedType, inventoryProducts).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+  }, [inventoryProducts, selectedType]);
+  const otherInventory = useMemo(() => {
+    const matchingIds = new Set(filteredInventory.map((product) => product.id));
+    return inventoryProducts
+      .filter((product) => !matchingIds.has(product.id))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [inventoryProducts, filteredInventory]);
+  const presetCocktailRecipes = PRESET_RECIPES.filter(
+    (recipe) => recipe.category === "cocktail",
   );
-  const shouldShowInventorySelect = !!productType && !isCocktailDefault;
-  const shouldShowManualSearch = productType === "cocktail" && !isCocktailDefault;
+  const normalizeName = (value?: string) => value?.trim().toLowerCase() || "";
+  const findInventoryProductByName = (name?: string) =>
+    inventoryProducts.find(
+      (product) => normalizeName(product.name) === normalizeName(name),
+    );
+  const createCustomIngredientRow = (
+    base: Partial<CustomIngredientRow> = {},
+  ): CustomIngredientRow => ({
+    rowId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    productId: base.productId || "",
+    productName: base.productName || "",
+    quantity: base.quantity ?? 30,
+    unit: base.unit || "ml",
+    referenceName: base.referenceName,
+  });
+  const buildRowFromIngredient = (
+    ingredient: Partial<RecipeIngredient>,
+  ): CustomIngredientRow => {
+    const matchedProduct = findInventoryProductByName(ingredient.productName);
+    return createCustomIngredientRow({
+      productId: matchedProduct?.id,
+      productName: matchedProduct?.name || ingredient.productName || "",
+      quantity: ingredient.quantity || 0,
+      unit: ingredient.unit || "ml",
+      referenceName: ingredient.productName,
+    });
+  };
+  const addCustomIngredientRow = () => {
+    setCustomIngredients((prev) => [...prev, createCustomIngredientRow()]);
+  };
+  const updateCustomIngredient = (
+    rowId: string,
+    updates: Partial<CustomIngredientRow>,
+  ) => {
+    setCustomIngredients((prev) =>
+      prev.map((ingredient) =>
+        ingredient.rowId === rowId ? { ...ingredient, ...updates } : ingredient,
+      ),
+    );
+  };
+  const removeCustomIngredientRow = (rowId: string) => {
+    setCustomIngredients((prev) => prev.filter((ingredient) => ingredient.rowId !== rowId));
+  };
+  const handleCustomProductChange = (rowId: string, productId: string) => {
+    const product = inventoryProducts.find((item) => item.id === productId);
+    updateCustomIngredient(rowId, {
+      productId,
+      productName: product?.name || "",
+    });
+  };
+  const applyPresetRecipe = (recipeName: string) => {
+    const recipe = presetCocktailRecipes.find((item) => item.name === recipeName);
+    if (!recipe) {
+      setCustomIngredients([]);
+      setCustomCocktailName("");
+      return;
+    }
+    setCustomCocktailName(recipe.name || "");
+    const rows =
+      (recipe.ingredients || []).map((ingredient) => buildRowFromIngredient(ingredient));
+    setCustomIngredients(rows.length > 0 ? rows : [createCustomIngredientRow()]);
+  };
+  const selectedProduct = inventoryProducts.find((product) => product.id === selectedProductId);
+  const servingDefaults = useMemo(
+    () => getDefaultServingForSelection(selectedType, selectedContainer),
+    [selectedType, selectedContainer],
+  );
+  const servingVolume = servingDefaults.quantity || 0;
+  const customTotalVolume = useMemo(
+    () => customIngredients.reduce((sum, ingredient) => sum + (ingredient.quantity || 0), 0),
+    [customIngredients],
+  );
+  const getBottleSize = (product?: Product): number => {
+    if (!product) return 0;
+    if (product.bottleSizeInMl && product.bottleSizeInMl > 0) return product.bottleSizeInMl;
+    const unit = product.unit?.toLowerCase?.() || "";
+    if (unit.includes("bottle") || unit.includes("bouteille")) {
+      return product.category === "beer" ? 341 : 750;
+    }
+    return 750;
+  };
+  const calculateIngredientCost = (ingredient: RecipeIngredient): number => {
+    const product =
+      ingredient.productId
+        ? inventoryProducts.find((item) => item.id === ingredient.productId)
+        : findInventoryProductByName(ingredient.productName);
+    if (!product || ingredient.quantity <= 0) return 0;
+    const bottleSize = getBottleSize(product);
+    if (bottleSize <= 0) return 0;
+    const costPerMl = product.price / bottleSize;
+    return costPerMl * ingredient.quantity;
+  };
+  const estimatedCost = useMemo(() => {
+    if (isMultiIngredientCocktail) {
+      const cost = customIngredients.reduce(
+        (sum, ingredient) => sum + calculateIngredientCost(ingredient),
+        0,
+      );
+      return cost > 0 ? cost : null;
+    }
+    if (!selectedProduct || servingVolume <= 0) return null;
+    const bottleSize = getBottleSize(selectedProduct);
+    if (bottleSize <= 0) return null;
+    const costPerMl = selectedProduct.price / bottleSize;
+    return costPerMl * servingVolume;
+  }, [
+    customIngredients,
+    inventoryProducts,
+    isMultiIngredientCocktail,
+    selectedProduct,
+    servingVolume,
+  ]);
+  useEffect(() => {
+    if (estimatedCost === null) return;
+    if (!Number.isFinite(profitMargin)) return;
+    if (!isMultiIngredientCocktail && !selectedProduct) return;
+    const computedPrice = estimatedCost * (1 + profitMargin / 100);
+    if (!Number.isFinite(computedPrice)) return;
+    setPriceInput(computedPrice.toFixed(2));
+  }, [estimatedCost, profitMargin, selectedProduct, isMultiIngredientCocktail]);
+  const resetForm = () => {
+    setStep(1);
+    setSelectedType("");
+    setSelectedContainer("");
+    setSelectedProductId("");
+    setPriceInput("");
+    setCustomIngredients([]);
+    setCustomCocktailName("");
+    setSelectedPresetRecipeName("");
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      resetForm();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isPresetCocktail) {
+      if (!selectedPresetRecipeName && presetCocktailRecipes.length > 0) {
+        setSelectedPresetRecipeName(presetCocktailRecipes[0].name || "");
+        return;
+      }
+      if (selectedPresetRecipeName) {
+        applyPresetRecipe(selectedPresetRecipeName);
+      }
+      return;
+    }
+    if (isCustomCocktail) {
+      setCustomIngredients((prev) =>
+        prev.length > 0 ? prev : [createCustomIngredientRow()],
+      );
+      return;
+    }
+    if (customIngredients.length > 0) {
+      setCustomIngredients([]);
+    }
+    if (customCocktailName) {
+      setCustomCocktailName("");
+    }
+    if (selectedPresetRecipeName) {
+      setSelectedPresetRecipeName("");
+    }
+  }, [
+    isCustomCocktail,
+    isPresetCocktail,
+    selectedPresetRecipeName,
+    presetCocktailRecipes.length,
+    inventoryProducts,
+  ]);
 
   useEffect(() => {
     setSelectedContainer("");
-    setSelectedDefaultRecipe("");
-    setIngredients([]);
-    setRecipePrice("");
     setSelectedProductId("");
-    setSearchQuery("");
-    setEditingIngredientIndex(null);
-  }, [productType]);
+    setPriceInput("");
+    setStep(1);
+    setCustomIngredients([]);
+    setCustomCocktailName("");
+    setSelectedPresetRecipeName("");
+  }, [selectedType]);
 
-  useEffect(() => {
-    if (productType !== "cocktail") return;
-    setSelectedDefaultRecipe("");
-    setIngredients([]);
-    setRecipePrice("");
-    setSelectedProductId("");
-    setEditingIngredientIndex(null);
-  }, [selectedContainer, productType]);
-
-  const getSuggestedProducts = (): Product[] => {
-    let filtered = filterProductsForType(productType, inventoryProducts, {
-      allowFullInventoryForCocktail: shouldShowFullCocktailInventory,
-    });
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter((product) =>
-        product.name.toLowerCase().includes(q) || product.category.toLowerCase().includes(q),
-      );
-    }
-    filtered = filtered.sort((a, b) => a.name.localeCompare(b.name));
-    return filtered.slice(0, 20);
+  const getStepLabel = () => {
+    if (!selectedType) return "Type de produit";
+    const option = PRODUCT_TYPE_OPTIONS.find((item) => item.value === selectedType);
+    return option?.label || "Produit";
   };
 
-  const associationInventoryProducts = useMemo(() => {
-    const baseProducts = filterProductsForType(productType, inventoryProducts, {
-      allowFullInventoryForCocktail: shouldShowFullCocktailInventory || isCocktailDefault,
-    });
-    const query = associationSearchQuery.trim().toLowerCase();
-    let filtered = baseProducts;
-    if (query) {
-      filtered = filtered.filter((product) => {
-        const name = product.name.toLowerCase();
-        const category = product.category?.toLowerCase?.() || "";
-        return name.includes(query) || category.includes(query);
-      });
-    }
-    return filtered.sort((a, b) => a.name.localeCompare(b.name)).slice(0, 30);
-  }, [
-    inventoryProducts,
-    productType,
-    shouldShowFullCocktailInventory,
-    isCocktailDefault,
-    associationSearchQuery,
-  ]);
-
-  const handleDefaultRecipeChange = (value: string) => {
-    setSelectedDefaultRecipe(value);
-    if (!value) {
-      setIngredients([]);
-      return;
-    }
-    const preset = PRESET_RECIPES.find((r) => r.name === value);
-    if (!preset) {
-      setIngredients([]);
-      return;
-    }
-    const mapped = (preset.ingredients || []).map((ing) => {
-      const match = inventoryProducts.find((product) =>
-        product.name.toLowerCase().includes(ing.productName.toLowerCase()),
-      );
-      return {
-        productId: match?.id,
-        productName: match?.name || ing.productName,
-        quantity: ing.quantity,
-        unit: ing.unit,
-        sourceMissing: !match,
-      } as RecipeIngredient;
-    });
-    setIngredients(mapped);
-    if (preset.price) {
-      setRecipePrice(String(preset.price));
-    }
+  const canAdvance = (): boolean => {
+    if (step === 1) return !!selectedType;
+    if (step === 2) return !containerOptions || !!selectedContainer;
+    return false;
   };
 
+  const handleNextStep = () => {
+    if (!canAdvance()) return;
+    setStep((prev) => Math.min(3, prev + 1));
+  };
 
-  const handleProductSuggestionClick = (product: Product) => {
-    if (editingIngredientIndex !== null) {
-      setIngredients((prev) =>
-        prev.map((ingredient, idx) =>
-          idx === editingIngredientIndex
-            ? {
-                ...ingredient,
-                productId: product.id,
-                productName: product.name,
-                sourceMissing: false,
-              }
-            : ingredient,
-        ),
-      );
-      setEditingIngredientIndex(null);
-      setSearchQuery("");
-      setShowSuggestions(false);
-      return;
-    }
-    const defaults = getDefaultServingForSelection(productType, selectedContainer);
+  const handleSelectType = (type: ProductTypeOption) => {
+    setSelectedType(type);
+    setStep(2);
+  };
+
+  const handleSelectContainer = (value: string) => {
+    setSelectedContainer(value);
+    setStep(3);
+  };
+
+  const handleSelectProduct = (product: Product) => {
     setSelectedProductId(product.id);
-    setIngredientUnit(defaults.unit);
-    setIngredientQuantity(defaults.quantity ? String(defaults.quantity) : "");
-    setSearchQuery(product.name);
-    setShowSuggestions(false);
   };
 
-  const handleAssociationProductSelect = (product: Product) => {
-    handleProductSuggestionClick(product);
-    setAssociationSearchQuery("");
-    setAssociationDialogOpen(false);
+  const handlePriceChange = (value: string) => {
+    const normalized = value.replace(",", ".").replace(/[^0-9.]/g, "");
+    const [integer, decimals = ""] = normalized.split(".");
+    const truncated = decimals.slice(0, 2);
+    setPriceInput(truncated ? `${integer || "0"}.${truncated}` : integer);
   };
 
-  const handleAssociationDialogChange = (open: boolean) => {
-    setAssociationDialogOpen(open);
-    if (!open) {
-      setEditingIngredientIndex(null);
-      setAssociationSearchQuery("");
-    }
-  };
+  const renderTypeStep = () => (
+    <div className="space-y-3">
+      <Label className="text-base font-semibold">1. Type de produit</Label>
+      <p className="text-xs text-muted-foreground">
+        Choisissez la catégorie qui correspond au service (vin, bière, shot, cocktail ou autres).
+      </p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {PRODUCT_TYPE_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => handleSelectType(option.value)}
+            className={`p-3 border-2 rounded-lg text-left transition-all ${
+              selectedType === option.value
+                ? "border-primary bg-primary/10"
+                : "border-border hover:border-primary/50"
+            }`}
+          >
+            <div className="font-semibold">{option.label}</div>
+            <p className="text-xs text-muted-foreground">{option.helper}</p>
+          </button>
+        ))}
+      </div>
+      <div className="flex justify-end">
+        <Button onClick={handleNextStep} disabled={!selectedType}>
+          Suivant
+        </Button>
+      </div>
+    </div>
+  );
 
-  const handleInventoryProductSelect = (product: Product) => {
-    if (!productType) return;
-    const defaults = getDefaultServingForSelection(productType, selectedContainer);
-    setSelectedProductId(product.id);
-    setIngredientUnit(defaults.unit);
-    setIngredientQuantity(defaults.quantity ? String(defaults.quantity) : "");
-    setSearchQuery(product.name);
-    setShowSuggestions(false);
-    setTimeout(() => {
-      if (defaults.quantity) {
-        addIngredient();
-      }
-    }, 0);
-  };
-
-  const addIngredient = () => {
-    if (!selectedProductId || !ingredientQuantity) return;
-    const quantityValue = parseFloat(ingredientQuantity);
-    if (!quantityValue || quantityValue <= 0) return;
-    const product = inventoryProducts.find((p) => p.id === selectedProductId);
-    if (!product) return;
-    const newIngredient: RecipeIngredient = {
-      productId: product.id,
-      productName: product.name,
-      quantity: quantityValue,
-      unit: ingredientUnit,
-      sourceMissing: false,
-    };
-    if (productType !== "cocktail") {
-      setIngredients([newIngredient]);
-    } else {
-      if (ingredients.some((ing) => ing.productId === product.id)) {
-        alert("Ce produit est déjà dans la recette");
-        return;
-      }
-      setIngredients([...ingredients, newIngredient]);
-    }
-    setSelectedProductId("");
-    setIngredientQuantity("");
-    setIngredientUnit("ml");
-    setSearchQuery("");
-  };
-
-
-  const startIngredientAssociation = (index: number, name: string) => {
-    setEditingIngredientIndex(index);
-    setAssociationSearchQuery(name);
-    setAssociationDialogOpen(true);
-  };
-
-  const removeIngredient = (index: number) => {
-    setIngredients((prev) => prev.filter((_, idx) => idx !== index));
-  };
-
-  const updateIngredientQuantity = (index: number, value: number) => {
-    setIngredients((prev) =>
-      prev.map((ingredient, idx) =>
-        idx === index ? { ...ingredient, quantity: Math.max(0, value) } : ingredient,
-      ),
-    );
-  };
-
-  const updateIngredientUnit = (index: number, value: string) => {
-    setIngredients((prev) =>
-      prev.map((ingredient, idx) =>
-        idx === index ? { ...ingredient, unit: value } : ingredient,
-      ),
-    );
-  };
-
-  const calculateRecipeCost = (): number => {
-    if (ingredients.length === 0) return 0;
-    let totalCost = 0;
-    ingredients.forEach((ingredient) => {
-      if (!ingredient.productId) return;
-      const product = inventoryProducts.find((p) => p.id === ingredient.productId);
-      if (!product) return;
-      let productSizeInMl = 0;
-      if ((product as any).bottleSizeInMl && (product as any).bottleSizeInMl > 0) {
-        productSizeInMl = (product as any).bottleSizeInMl;
-      } else if ((product as any).quantityInMl && (product as any).quantityInMl > 0) {
-        productSizeInMl = (product as any).quantityInMl;
-      } else if (
-        product.unit.toLowerCase().includes("bottle") ||
-        product.unit.toLowerCase().includes("bouteille")
-      ) {
-        productSizeInMl = product.category === "beer" ? 341 : 750;
-      } else if (product.unit.toLowerCase().includes("ml")) {
-        productSizeInMl = parseFloat(product.unit.match(/[\d.]+/)?.[0] || "750");
-      } else if (product.unit.toLowerCase().includes("oz")) {
-        const oz = parseFloat(product.unit.match(/[\d.]+/)?.[0] || "1.5");
-        productSizeInMl = oz * 29.5735;
-      } else {
-        productSizeInMl = 750;
-      }
-      const costPerMl = productSizeInMl > 0 ? product.price / productSizeInMl : product.price;
-      let ingredientQuantityInMl = 0;
-      if (ingredient.unit === "ml") {
-        ingredientQuantityInMl = ingredient.quantity;
-      } else if (ingredient.unit === "oz") {
-        ingredientQuantityInMl = ingredient.quantity * 29.5735;
-      } else if (ingredient.unit === "cl") {
-        ingredientQuantityInMl = ingredient.quantity * 10;
-      } else if (ingredient.unit === "l" || ingredient.unit === "litre") {
-        ingredientQuantityInMl = ingredient.quantity * 1000;
-      } else if (ingredient.unit === "unit") {
-        const costPerUnit = product.price / (product.quantity || 1);
-        totalCost += costPerUnit * ingredient.quantity;
-        return;
-      } else {
-        const costPerUnit = product.price / (product.quantity || 1);
-        totalCost += costPerUnit * ingredient.quantity;
-        return;
-      }
-      totalCost += costPerMl * ingredientQuantityInMl;
-    });
-    return totalCost;
-  };
-
-  const recipeCost = calculateRecipeCost();
-  const marginPercentage = parseFloat(profitMargin) || 40;
-  const suggestedPrice = recipeCost > 0 ? (recipeCost * (1 + marginPercentage / 100)).toFixed(2) : "";
-
-  useEffect(() => {
-    if (suggestedPrice && ingredients.length > 0) {
-      setRecipePrice(suggestedPrice);
-    }
-  }, [suggestedPrice, ingredients.length]);
-
-  const manualSelectionDisabled =
-    !productType || (requiresContainer && !selectedContainer);
-  const containerOptions = isProductTypeOption(productType)
-    ? CONTAINER_OPTIONS[productType]
-    : undefined;
-
-  const handleSave = () => {
-    if (!productType) {
-      alert("Choisissez un type de produit");
-      return;
-    }
-    if (requiresContainer && !selectedContainer) {
-      alert("Choisissez un contenant");
-      return;
-    }
-    if (isCocktailDefault && !selectedDefaultRecipe) {
-      alert("Sélectionnez une recette standard");
-      return;
-    }
-    if (ingredients.length === 0) {
-      alert("Ajoutez au moins un ingrédient");
-      return;
-    }
-    if (ingredients.some((ing) => !ing.productId)) {
-      alert("Associez tous les ingrédients à l'inventaire");
-      return;
-    }
-    if (!recipePrice.trim() || parseFloat(recipePrice) <= 0) {
-      alert("Entrez un prix de vente valide");
-      return;
-    }
-    const baseName =
-      isCocktailDefault && selectedDefaultRecipe
-        ? selectedDefaultRecipe
-        : ingredients.length === 1
-        ? `${ingredients[0].productName}${
-            getContainerLabel(productType, selectedContainer)
-              ? ` - ${getContainerLabel(productType, selectedContainer)}`
-              : ""
-          }`
-        : `${ingredients[0].productName} + ${ingredients.length - 1} ingrédient(s)`;
-    const recipe: Recipe = {
-      id: `recipe-${Date.now()}`,
-      name: baseName,
-      price: parseFloat(recipePrice),
-      ingredients: ingredients.map(({ sourceMissing, ...rest }) => rest),
-      category: mapProductTypeToCategory(productType as ProductTypeOption),
-    };
-    onSave(recipe);
-  };
-
-  const ingredientUnitOptions = ["ml", "oz", "cl", "l", "unit"];
-  const manualHelper = !productType
-    ? "Choisissez un type de produit pour demarrer le questionnaire."
-    : requiresContainer && !selectedContainer
-    ? "Completez d'abord la question 2 (contenant)."
-    : isCocktailDefault
-    ? "Les ingredients proviennent de la recette standard. Ajustez-les au besoin."
-    : null;
-
-  return (
-    <>
-      <Dialog open={associationDialogOpen} onOpenChange={handleAssociationDialogChange}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Associer l'ingrédient à l'inventaire</DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
-              Recherchez et sélectionnez un produit pour synchroniser cet ingrédient.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <Input
-              autoFocus
-              placeholder="Rechercher un produit..."
-              value={associationSearchQuery}
-              onChange={(e) => setAssociationSearchQuery(e.target.value)}
-              className="w-full"
-            />
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {associationInventoryProducts.length > 0 ? (
-                associationInventoryProducts.map((product) => (
-                  <button
-                    key={`${product.id}-assoc`}
-                    type="button"
-                    onClick={() => handleAssociationProductSelect(product)}
-                    className="w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-left transition hover:bg-accent/50"
-                  >
-                    <div className="font-semibold">{product.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {product.category} • {product.quantity} en stock
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">Aucun produit trouvé dans l'inventaire.</p>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => handleAssociationDialogChange(false)}>
-              Fermer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <div className="space-y-3 py-2">
-        <div className="space-y-2">
-        <Label className="text-base font-semibold">1. Type de produit</Label>
-    <p className="text-xs text-muted-foreground">
-          Choisissez entre vin, bière, shot, cocktail ou autres pour definir le type de service.
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {PRODUCT_TYPE_OPTIONS.map((option) => (
+  const renderContainerStep = () => (
+    <div className="space-y-3">
+      <Label className="text-base font-semibold">2. Contenant</Label>
+      <p className="text-xs text-muted-foreground">
+        Sélectionnez le format ou le service qui sera vendu dans ce contenant.
+      </p>
+      {containerOptions?.length ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {containerOptions.map((option) => (
             <button
               key={option.value}
               type="button"
-              onClick={() => setProductType(option.value)}
+              onClick={() => handleSelectContainer(option.value)}
               className={`p-3 border-2 rounded-lg text-left transition-all ${
-                productType === option.value
+                selectedContainer === option.value
                   ? "border-primary bg-primary/10"
                   : "border-border hover:border-primary/50"
               }`}
             >
-              <div className="font-semibold">{option.label}</div>
-              <div className="text-xs text-muted-foreground">{option.helper}</div>
+              <span className="font-semibold text-sm">{option.label}</span>
             </button>
           ))}
         </div>
-      </div>
-
-      {containerOptions && productType && (
-        <div className="space-y-2">
-          <Label className="text-base font-semibold">2. Contenant</Label>
-          <p className="text-xs text-muted-foreground">
-            Selectionnez le format (verre, demi-litre, pinte, buck, recette par defaut, etc.).
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {containerOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setSelectedContainer(option.value)}
-                className={`p-3 border-2 rounded-lg text-left transition-all ${
-                  selectedContainer === option.value
-                    ? "border-primary bg-primary/10"
-                    : "border-border hover:border-primary/50"
-                }`}
-              >
-                <div className="font-semibold text-sm">{option.label}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {!containerOptions && productType && productType !== "cocktail" && (
-        <div className="space-y-1">
-          <Label className="text-base font-semibold">2. Contenant</Label>
-          <p className="text-xs text-muted-foreground">
-            Aucun contenant particulier n'est requis pour ce type. Vous pouvez passer directement a la question 4.
-          </p>
-        </div>
-      )}
-
-      {isCocktailDefault && (
-        <div className="space-y-2">
-          <Label className="text-base font-semibold">3. Recette standard</Label>
-          <select
-            value={selectedDefaultRecipe}
-            onChange={(e) => handleDefaultRecipeChange(e.target.value)}
-            className="w-full border rounded-lg p-2 bg-background"
-          >
-            <option value="">Sélectionner une recette...</option>
-            {PRESET_RECIPES.filter((r) => r.category === "cocktail").map((recipe) => (
-              <option key={recipe.name} value={recipe.name}>
-                {recipe.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      <div className="space-y-3">
-        <Label className="text-base font-semibold">4. Ingrédients / produit</Label>
+      ) : (
         <p className="text-xs text-muted-foreground">
-          Après avoir choisi le type (Q1) et le contenant (Q2), sélectionnez ici ce que vous versez dans ce contenant.
+          Ce type utilise automatiquement un contenant standard.
         </p>
-        {manualHelper && (
-          <p className="text-xs text-muted-foreground">{manualHelper}</p>
-        )}
-        {shouldShowInventorySelect && (
-          <div className="space-y-3">
-            <Label className="font-semibold text-sm">Liste de l'inventaire</Label>
-            <p className="text-xs text-muted-foreground">
-              Cette section liste les articles disponibles dans l'inventaire filtrés selon le type sélectionné.
-            </p>
-            {filteredInventoryProducts.length > 0 ? (
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {filteredInventoryProducts.map((product) => (
-                  <div
-                    key={product.id}
-                    className="w-full p-3 rounded-lg border-2 border-border text-left bg-background/60"
-                  >
-                    <div className="flex justify-between items-center gap-2">
-                      <span className="font-semibold text-sm line-clamp-1">{product.name}</span>
-                      <span className="text-xs text-muted-foreground">{product.quantity} en stock</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Catégorie : {product.category}
-                    </p>
-                    <div className="mt-2 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => handleInventoryProductSelect(product)}
-                        className="text-xs font-semibold text-primary hover:underline"
-                      >
-                        Utiliser ce produit
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-destructive">
-                Aucun produit disponible pour ce type. Ajoutez des articles dans l'inventaire d'abord.
+      )}
+      <div className="flex justify-between">
+        <Button variant="outline" onClick={() => setStep(1)}>
+          Étape précédente
+        </Button>
+        <Button onClick={handleNextStep} disabled={!canAdvance()}>
+          Suivant
+        </Button>
+      </div>
+    </div>
+  );
+
+  const inventoryOptions = inventoryProducts.map((product) => (
+    <option key={product.id} value={product.id}>
+      {product.name} • {translateUnit(product.unit)} • {product.quantity ?? 0} en stock
+    </option>
+  ));
+
+  const renderProductStep = () => {
+    const containerLabel = selectedContainer
+      ? getContainerLabel(selectedType, selectedContainer)
+      : "";
+    const bottleSize = selectedProduct ? getBottleSize(selectedProduct) : 0;
+    return (
+      <div className="space-y-3">
+        <Label className="text-base font-semibold">3. Produit</Label>
+        <p className="text-xs text-muted-foreground">
+          Sélectionnez un article disponible dans l'inventaire filtré selon le type choisi.
+        </p>
+        {!isMultiIngredientCocktail ? (
+          <>
+            <select
+              className="w-full p-3 border rounded-lg bg-background text-sm"
+              value={selectedProductId}
+              onChange={(event) => {
+                const product = inventoryProducts.find((item) => item.id === event.target.value);
+                if (product) {
+                  handleSelectProduct(product);
+                } else {
+                  setSelectedProductId("");
+                }
+              }}
+            >
+              <option value="">Choisissez un produit</option>
+              {filteredInventory.length > 0 && (
+                <optgroup label="Inventaire compatible">
+                  {filteredInventory.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name} • {translateUnit(product.unit)} • {product.quantity ?? 0} en stock
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {otherInventory.length > 0 && (
+                <optgroup label="Autres produits inventaire">
+                  {otherInventory.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name} • {translateUnit(product.unit)} • {product.quantity ?? 0} en stock
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+            {filteredInventory.length === 0 && otherInventory.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                Aucun produit disponible pour ce type.
               </p>
             )}
-          </div>
-        )}
-        {shouldShowManualSearch && (
-          <div className="space-y-2">
-            <Label htmlFor="searchProduct" className="font-semibold text-sm">
-              Produit de l'inventaire
-            </Label>
-            <div className="relative">
-              <Input
-                id="searchProduct"
-                value={searchQuery}
-                disabled={manualSelectionDisabled}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setShowSuggestions(true);
-                }}
-                onFocus={() => !manualSelectionDisabled && setShowSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                placeholder="Rechercher un produit"
-                className="pr-10"
-                autoComplete="off"
-              />
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              {showSuggestions && !manualSelectionDisabled && (
-                <div className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                  {getSuggestedProducts().length > 0 ? (
-                    getSuggestedProducts().map((product) => (
-                      <button
-                        key={product.id}
-                        type="button"
-                        onMouseDown={() => handleProductSuggestionClick(product)}
-                        className="w-full px-3 py-2 text-left hover:bg-accent flex items-center justify-between"
-                      >
-                        <div>
-                          <div className="font-semibold">{product.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {product.category} ・ Stock: {product.quantity}
-                          </div>
-                        </div>
-                        <Plus className="h-4 w-4" />
-                      </button>
-                    ))
-                  ) : (
-                    <div className="px-3 py-2 text-sm text-muted-foreground">Aucun produit trouvé</div>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                min="0"
-                step="0.1"
-                value={ingredientQuantity}
-                onChange={(e) => setIngredientQuantity(e.target.value)}
-                placeholder="Quantité"
-                disabled={manualSelectionDisabled}
-              />
-              <select
-                value={ingredientUnit}
-                onChange={(e) => setIngredientUnit(e.target.value)}
-                className="px-3 py-2 border rounded-lg bg-background"
-                disabled={manualSelectionDisabled}
-              >
-                {ingredientUnitOptions.map((unitOption) => (
-                  <option key={unitOption} value={unitOption}>
-                    {unitOption}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <Button
-              type="button"
-              onClick={addIngredient}
-              disabled={manualSelectionDisabled || !selectedProductId || !ingredientQuantity}
-              className="w-full"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Ajouter cet ingrédient
-            </Button>
-          </div>
-        )}
-
-        {ingredients.length > 0 ? (
-          <div className="space-y-2 border-2 border-dashed rounded-lg p-4 bg-background/50">
-            {ingredients.map((ingredient, index) => {
-              const ingredientProduct = ingredient.productId
-                ? inventoryProducts.find((p) => p.id === ingredient.productId)
-                : null;
-              const isOutOfStock =
-                ingredientProduct && ingredientProduct.quantity <= 0;
-              return (
-                <div
-                  key={`${ingredient.productId || ingredient.productName}-${index}`}
-                  className="space-y-2 border border-border rounded-lg p-3 bg-card/50"
-                >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-semibold text-sm">{ingredient.productName}</p>
-                    {!ingredient.productId || ingredient.sourceMissing ? (
-                      <div className="text-xs text-destructive flex flex-col gap-2">
-                        <button
-                          type="button"
-                          onClick={() => startIngredientAssociation(index, ingredient.productName)}
-                          className="text-primary underline text-left"
-                        >
-                          Chercher dans l'inventaire
-                        </button>
-                      </div>
-                    ) : isOutOfStock ? (
-                      <p className="text-xs text-destructive">
-                        Produit disponible mais actuellement en rupture de stock
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">Ingrédient synchronisé</p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeIngredient(index)}
-                    className="p-1 rounded hover:bg-secondary"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={ingredient.quantity}
-                    onChange={(e) => updateIngredientQuantity(index, parseFloat(e.target.value) || 0)}
-                  />
-                  <select
-                    value={ingredient.unit}
-                    onChange={(e) => updateIngredientUnit(index, e.target.value)}
-                    className="px-3 py-2 border rounded-lg bg-background"
-                  >
-                    {ingredientUnitOptions.map((unitOption) => (
-                      <option key={unitOption} value={unitOption}>
-                        {unitOption}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            );
-          })}
-          </div>
+          </>
         ) : (
-          <div className="text-sm text-muted-foreground border-2 border-dashed rounded-lg p-4">
-            Aucun ingrédient pour le moment
+          <div className="space-y-3">
+            {isPresetCocktail && (
+              <div className="space-y-1">
+                <Label className="text-sm font-semibold">Recette par défaut</Label>
+                <select
+                  className="w-full p-2 border rounded-lg bg-background text-sm"
+                  value={selectedPresetRecipeName}
+                  onChange={(event) => {
+                    setSelectedPresetRecipeName(event.target.value);
+                  }}
+                >
+                  <option value="">Sélectionnez une recette...</option>
+                  {presetCocktailRecipes.map((recipe) => (
+                    <option key={recipe.name} value={recipe.name}>
+                      {recipe.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {isCustomCocktail && (
+              <div className="space-y-1">
+                <Label className="text-sm font-semibold">Nom du cocktail maison</Label>
+                <Input
+                  className="bg-white"
+                  placeholder="Nom du cocktail"
+                  value={customCocktailName}
+                  onChange={(event) => setCustomCocktailName(event.target.value)}
+                />
+              </div>
+            )}
+            <div className="space-y-3 rounded-lg border border-border p-3">
+              {(customIngredients.length === 0 ? [createCustomIngredientRow()] : customIngredients).map(
+                (ingredient) => (
+                  <div key={ingredient.rowId} className="grid grid-cols-12 gap-2 items-end">
+                    <div className="col-span-12">
+                      <p className="text-[11px] text-muted-foreground">
+                        {ingredient.referenceName
+                          ? `Recette : ${ingredient.referenceName}`
+                          : "Ingrédient personnalisé"}
+                        {ingredient.quantity
+                          ? ` — ${ingredient.quantity} ${ingredient.unit}`
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="col-span-7 space-y-1">
+                      <Label className="text-xs font-semibold">Produit</Label>
+                      <select
+                        className="w-full p-2 rounded border border-border text-sm"
+                        value={ingredient.productId || ""}
+                        onChange={(event) => handleCustomProductChange(ingredient.rowId, event.target.value)}
+                      >
+                        <option value="">Choisissez un produit</option>
+                        {inventoryOptions}
+                      </select>
+                    </div>
+                    <div className="col-span-3 space-y-1">
+                      <Label className="text-xs font-semibold">Quantité (ml)</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={ingredient.quantity}
+                        onChange={(event) =>
+                          updateCustomIngredient(ingredient.rowId, {
+                            quantity: Number(event.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="col-span-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => removeCustomIngredientRow(ingredient.rowId)}
+                        className="text-destructive hover:text-destructive/80"
+                        aria-label="Supprimer cet ingrédient"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ),
+              )}
+              <Button variant="outline" onClick={addCustomIngredientRow}>
+                Ajouter un ingrédient
+              </Button>
+            </div>
           </div>
         )}
-      </div>
-
-      {ingredients.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold">5. Prix coûtant</Label>
-            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center justify-between">
-              <span className="text-xs font-semibold text-blue-900 dark:text-blue-100">Coût</span>
-              <span className="text-lg font-bold text-blue-700 dark:text-blue-300">${recipeCost.toFixed(2)}</span>
-            </div>
+        {estimatedCost !== null && (
+          <div className="p-3 border rounded-lg bg-secondary/50 space-y-1 text-sm">
+            <p className="font-semibold text-foreground">
+              Coût estimé du service : ${estimatedCost.toFixed(2)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {isMultiIngredientCocktail
+                ? `Basé sur ${customTotalVolume} ml total d'ingrédients.`
+                : `Basé sur ${servingVolume} ml/${bottleSize} ml de la bouteille.`}
+            </p>
           </div>
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold">Marge (%)</Label>
+        )}
+        {estimatedCost !== null && (
+          <div className="space-y-1">
+            <Label className="text-sm font-semibold">Marge de profit (%)</Label>
             <Input
               type="number"
               min="0"
+              step="1"
               value={profitMargin}
-              onChange={(e) => setProfitMargin(e.target.value)}
+              onChange={(event) => setProfitMargin(Number(event.target.value))}
             />
+            <p className="text-[11px] text-muted-foreground">
+              Le prix de vente suggéré serait{" "}
+              {estimatedCost && profitMargin >= 0
+                ? `$${(estimatedCost * (1 + profitMargin / 100)).toFixed(2)}`
+                : "0.00"}
+              .
+            </p>
           </div>
-          {suggestedPrice && (
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Prix suggéré</Label>
-              <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center justify-between">
-                <span className="text-xs font-semibold text-green-900 dark:text-green-100">{marginPercentage}%</span>
-                <span className="text-lg font-bold text-green-700 dark:text-green-300">${suggestedPrice}</span>
-              </div>
-            </div>
+        )}
+        <div className="space-y-1">
+          <Label className="text-sm font-semibold">Prix de vente</Label>
+          <Input
+            placeholder="0.00"
+            value={priceInput}
+            onChange={(event) => handlePriceChange(event.target.value)}
+            disabled={!(selectedProduct || isMultiIngredientCocktail)}
+          />
+          {containerLabel && (
+            <p className="text-xs text-muted-foreground">
+              Contenant choisi : {containerLabel}
+            </p>
           )}
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold">5. Prix de vente *</Label>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={recipePrice}
-              onChange={(e) => setRecipePrice(e.target.value)}
-              placeholder={suggestedPrice || "0.00"}
-            />
-          </div>
         </div>
-      )}
+      </div>
+    );
+  };
 
-      <DialogFooter>
+  const handleSave = () => {
+    if (!selectedType) {
+      alert("Choisissez un type de produit.");
+      return;
+    }
+    if (containerOptions?.length && !selectedContainer) {
+      alert("Sélectionnez un contenant.");
+      return;
+    }
+    const priceValue = parseFloat(priceInput.replace(",", "."));
+    if (Number.isNaN(priceValue) || priceValue <= 0) {
+      alert("Entrez un prix valide.");
+      return;
+    }
+    if (!selectedProduct && !isMultiIngredientCocktail) {
+      alert("Sélectionnez un produit de l'inventaire.");
+      return;
+    }
+    const ingredientDefaults = getDefaultServingForSelection(selectedType, selectedContainer);
+    const containerLabel = getContainerLabel(selectedType, selectedContainer);
+    let ingredients: RecipeIngredient[] = [];
+    let name = "";
+    if (isMultiIngredientCocktail) {
+      const validIngredients = customIngredients
+        .filter((ingredient) => ingredient.productId && ingredient.quantity > 0)
+        .map((ingredient) => ({
+          productId: ingredient.productId,
+          productName: ingredient.productName,
+          quantity: ingredient.quantity,
+          unit: ingredient.unit,
+        }));
+      if (validIngredients.length === 0) {
+        alert("Ajoutez au moins un ingrédient avec une quantité valide.");
+        return;
+      }
+      ingredients = validIngredients;
+      name =
+        customCocktailName ||
+        selectedPresetRecipeName ||
+        "Cocktail maison";
+    } else if (selectedProduct) {
+      const quantity = ingredientDefaults.quantity || selectedProduct.quantity || 0;
+      ingredients = [
+        {
+          productId: selectedProduct.id,
+          productName: selectedProduct.name,
+          quantity,
+          unit: ingredientDefaults.unit || selectedProduct.unit,
+        },
+      ];
+      name = `${selectedProduct.name}${containerLabel ? ` - ${containerLabel}` : ""}`;
+    }
+    const recipe: Recipe = {
+      id: `sell-${Date.now()}`,
+      name,
+      displayName: name || selectedProduct?.name || "Produit de vente",
+      price: priceValue,
+      ingredients,
+      category: mapProductTypeToCategory(selectedType),
+      servingSize: isMultiIngredientCocktail
+        ? customTotalVolume || undefined
+        : ingredientDefaults.quantity,
+      containerLabel,
+      saleType: selectedType,
+    };
+    onSave(recipe);
+    resetForm();
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between text-xs uppercase text-muted-foreground">
+        <span>Étape {step} / 3</span>
+        <span>{getStepLabel()}</span>
+      </div>
+      {step === 1 && renderTypeStep()}
+      {step === 2 && renderContainerStep()}
+      {step === 3 && renderProductStep()}
+      <DialogFooter className="flex flex-wrap gap-2 justify-between">
         <Button variant="outline" onClick={onCancel}>
-          {t.common.cancel}
+          Annuler
         </Button>
-        <Button onClick={handleSave}>
-          <Wine className="h-4 w-4 mr-2" />
-          Créer le produit
-        </Button>
+        <div className="flex items-center gap-2">
+        {step > 1 && (
+          <Button variant="outline" onClick={() => setStep((prev) => Math.max(1, prev - 1))}>
+            Étape précédente
+          </Button>
+        )}
+        {step < 3 ? (
+          <Button onClick={handleNextStep} disabled={!canAdvance()}>
+            Suivant
+          </Button>
+        ) : (
+          <Button onClick={handleSave}>Enregistrer</Button>
+          )}
+        </div>
       </DialogFooter>
     </div>
-  </>
   );
 }
+

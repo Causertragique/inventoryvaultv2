@@ -26,6 +26,75 @@ import { Download, RefreshCw, Search, Image as ImageIcon } from "lucide-react";
 import { parseSaqProductPage, type SaqProductDetails } from "@shared/saq-parser";
 
 const SEARCH_SOURCE_KEY = "inventory-search-source";
+const PRIX_SAQ_CSV = "/Prix_Saq_restauration.csv";
+
+type SaqCsvRow = {
+  category: string;
+  productName: string;
+  normalizedName: string;
+  formatMl: number;
+  price: number;
+  country: string;
+};
+
+const normalizeString = (value: string): string =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const parseCsvLine = (line: string): string[] => {
+  const values: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i += 1;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (char === "," && !inQuotes) {
+      values.push(current);
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  values.push(current);
+  return values;
+};
+
+const parseSaqCsv = (csv: string): SaqCsvRow[] => {
+  const lines = csv.split(/\r?\n/).slice(2);
+  const rows: SaqCsvRow[] = [];
+  lines.forEach((line) => {
+    if (!line.trim()) return;
+    const cells = parseCsvLine(line);
+    const productName = cells[4] || "";
+    const category = cells[1] || "";
+    const formatLabel = cells[7] || "";
+    const country = cells[10] || "";
+    const formatMl = parseInt(formatLabel.replace(/[^\d]/g, ""), 10) || 0;
+    const priceRaw = (cells[9] || "").replace(/\s/g, "").replace(",", ".").replace(/[^0-9.]/g, "");
+    const price = Number.isNaN(Number(priceRaw)) ? 0 : Number(priceRaw);
+    if (!productName) return;
+    rows.push({
+      category,
+      productName,
+      normalizedName: normalizeString(productName),
+      formatMl,
+      price,
+      country,
+    });
+  });
+  return rows;
+};
 
 const formatPriceValue = (
   value: string | number | null | undefined
@@ -187,8 +256,9 @@ export default function AddProductModal(props: AddProductModalProps) {
     inventoryCode: "",
     imageUrl: "",
     bottleSizeInMl: "",
-    availableForSale: true,
+    availableForSale: false,
   }));
+  const [saqEntries, setSaqEntries] = useState<SaqCsvRow[]>([]);
 
   // Suggestion automatique depuis le CSV importé
   useEffect(() => {
@@ -239,7 +309,7 @@ export default function AddProductModal(props: AddProductModalProps) {
         inventoryCode: editingProduct.id || "",
         imageUrl: editingProduct.imageUrl || "",
         bottleSizeInMl: (editingProduct.bottleSizeInMl || "").toString(),
-        availableForSale: editingProduct.availableForSale ?? true,
+        availableForSale: editingProduct.availableForSale ?? false,
       });
       // Remplissage automatique du pays d'origine via l'API Excel
       if (editingProduct.name && editingProduct.category) {
@@ -264,7 +334,7 @@ export default function AddProductModal(props: AddProductModalProps) {
         inventoryCode: "",
         imageUrl: "",
         bottleSizeInMl: "",
-        availableForSale: true,
+        availableForSale: false,
       });
       setWasCodeManuallySet(false);
     }
@@ -282,6 +352,32 @@ export default function AddProductModal(props: AddProductModalProps) {
         });
     }
   }, [editingProduct, isOpen]);
+
+  useEffect(() => {
+    if (!saqEntries.length) return;
+    const name = formData.name.trim();
+    if (!name) return;
+    if (formData.pricePerBottle) return;
+    const normalizedQuery = normalizeString(name);
+    const matches = saqEntries.filter((entry) =>
+      entry.normalizedName.includes(normalizedQuery),
+    );
+    if (!matches.length) return;
+    const targetFormat = parseInt(formData.bottleSizeInMl || "", 10);
+    const formatMatch =
+      !Number.isNaN(targetFormat) && targetFormat > 0
+        ? matches.find((entry) => entry.formatMl === targetFormat)
+        : undefined;
+    const entry = formatMatch || matches[0];
+    setFormData((prev) => ({
+      ...prev,
+      pricePerBottle:
+        prev.pricePerBottle ||
+        (entry.price > 0 ? formatPriceValue(entry.price) : prev.pricePerBottle),
+      origin: prev.origin || entry.country || prev.origin,
+      category: prev.category || entry.category || prev.category,
+    }));
+  }, [formData.name, formData.bottleSizeInMl, saqEntries]);
 
   const [qrCodeValue, setQrCodeValue] = useState("");
   const [isSearchingImage, setIsSearchingImage] = useState(false);
@@ -305,6 +401,26 @@ export default function AddProductModal(props: AddProductModalProps) {
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadCsv = async () => {
+      try {
+        const response = await fetch(PRIX_SAQ_CSV);
+        if (!response.ok) return;
+        const text = await response.text();
+        if (cancelled) return;
+        const rows = parseSaqCsv(text);
+        setSaqEntries(rows);
+      } catch (error) {
+        console.warn("[AddProductModal] Impossible de charger le prix SAQ", error);
+      }
+    };
+    loadCsv();
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -1181,7 +1297,7 @@ export default function AddProductModal(props: AddProductModalProps) {
       subcategory: formData.subcategory || undefined,
       origin: formData.origin || undefined,
       bottleSizeInMl: formData.bottleSizeInMl ? parseInt(formData.bottleSizeInMl) : undefined,
-      availableForSale: formData.availableForSale ?? true,
+      availableForSale: formData.availableForSale ?? false,
     };
 
     onSave(product);
@@ -1217,7 +1333,7 @@ export default function AddProductModal(props: AddProductModalProps) {
       inventoryCode: "",
       imageUrl: "",
       bottleSizeInMl: "",
-      availableForSale: true,
+      availableForSale: false,
     });
     setQrCodeValue("");
     setWasCodeManuallySet(false);
@@ -1595,7 +1711,7 @@ export default function AddProductModal(props: AddProductModalProps) {
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="hidden">
             <Label className="text-sm font-semibold">
               Disponible à la vente ?
             </Label>
@@ -1606,7 +1722,7 @@ export default function AddProductModal(props: AddProductModalProps) {
             <label className="inline-flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
-                checked={formData.availableForSale ?? true}
+                checked={formData.availableForSale ?? false}
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,

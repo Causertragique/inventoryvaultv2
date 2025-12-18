@@ -300,20 +300,7 @@ export default function ProductCard({
           </div>
 
           {/* Actions - pushed to bottom */}
-          <div className="flex items-center justify-between gap-2 pt-2 border-t-2 border-foreground/20 mt-auto">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (canEdit) onEdit?.(product);
-              }}
-              className={`p-2 transition-colors ${canEdit ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/50 cursor-not-allowed"}`}
-              aria-label="Edit product"
-              type="button"
-              disabled={!canEdit}
-              title={canEdit ? undefined : "Vous n'avez pas la permission de modifier ce produit."}
-            >
-              <Edit2 className="h-4 w-4" />
-            </button>
+          <div className="flex items-center justify-between gap-4 pt-2 border-t-2 border-foreground/20 mt-auto">
             <div className="flex gap-3">
               <button
                 onClick={(e) => {
@@ -338,19 +325,34 @@ export default function ProductCard({
                 <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (canDelete) onDelete?.(product.id);
-              }}
-              className={`p-2 transition-colors ${canDelete ? "text-muted-foreground hover:text-destructive" : "text-muted-foreground/50 cursor-not-allowed"}`}
-              aria-label="Delete product"
-              type="button"
-              disabled={!canDelete}
-              title={canDelete ? undefined : "Vous n'avez pas la permission de supprimer ce produit."}
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-2 justify-end">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (canEdit) onEdit?.(product);
+                }}
+                className={`p-2 transition-colors ${canEdit ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/50 cursor-not-allowed"}`}
+                aria-label="Edit product"
+                type="button"
+                disabled={!canEdit}
+                title={canEdit ? undefined : "Vous n'avez pas la permission de modifier ce produit."}
+              >
+                <Edit2 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (canDelete) onDelete?.(product.id);
+                }}
+                className={`p-2 transition-colors ${canDelete ? "text-muted-foreground hover:text-destructive" : "text-muted-foreground/50 cursor-not-allowed"}`}
+                aria-label="Delete product"
+                type="button"
+                disabled={!canDelete}
+                title={canDelete ? undefined : "Vous n'avez pas la permission de supprimer ce produit."}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       ) : (

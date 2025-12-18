@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
-import { getAuth, OAuthProvider, signInWithPopup } from "firebase/auth";
+// import { OAuthProvider, signInWithPopup } from "firebase/auth";
 // Provider Apple utilisé localement dans le handler
-import { auth } from "@/lib/firebase";
 import { useNavigate } from "react-router-dom";
 import { loginWithEmail, signupWithEmail, loginWithGoogle, resetPassword } from "../services/firestore/auth";
 import { consumeInvite } from "@/services/firestore/invites";
 import { updateUserRole } from "@/services/firestore/users";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Card, CardContent, CardHeader } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -31,30 +30,6 @@ export default function Login() {
   }, [authLoading, user, navigate]);
 
     // Handler pour l'auth Apple
-    const handleAppleAuth = async () => {
-      setLoading(true);
-      try {
-        if (!auth) throw new Error("Apple Auth non initialisé");
-        const provider = new OAuthProvider("apple.com");
-        const result = await signInWithPopup(auth, provider);
-        // Traitement du résultat (sauvegarde, redirection, etc.)
-        console.log("Utilisateur Apple connecté :", result.user);
-        toast({
-          title: "Connexion réussie",
-          description: "Bienvenue !",
-        });
-        navigate("/inventory");
-      } catch (error: any) {
-        console.error("Erreur Apple Auth :", error);
-        toast({
-          title: "Erreur",
-          description: error.message || "Une erreur est survenue",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
 
   const applyInviteCodeIfAny = async (uid: string) => {
     const code = inviteCode.trim();
