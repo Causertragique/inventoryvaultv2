@@ -43,7 +43,9 @@ import {
   CheckCircle,
   Brain,
   Shield,
+  ShieldCheck,
   Trash2,
+  Users,
   FileDown,
 } from "lucide-react";
 import { usei18n } from "@/contexts/I18nContext";
@@ -1978,6 +1980,48 @@ export default function Settings() {
                     >
                       <FileDown className="h-4 w-4" />
                       {isDownloadingData ? t.settings.security.downloading : t.settings.security.downloadButton}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Logs d'audit */}
+              <div className="space-y-3 p-4 bg-secondary/30 rounded-lg border-2 border-foreground/10">
+                <div className="flex items-start gap-3">
+                  <ShieldCheck className="h-5 w-5 text-foreground/80 mt-0.5" />
+                  <div className="flex-1 space-y-2">
+                    <h3 className="font-medium text-sm">Logs d'audit</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Consultez l'historique des actions sensibles sur l'inventaire.
+                    </p>
+                    <Button
+                      onClick={() => navigate("/audit-logs")}
+                      variant="outline"
+                      className="w-full gap-2"
+                    >
+                      <ShieldCheck className="h-4 w-4" />
+                      Voir les logs d'audit
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gestion des utilisateurs */}
+              <div className="space-y-3 p-4 bg-secondary/30 rounded-lg border-2 border-foreground/10">
+                <div className="flex items-start gap-3">
+                  <Users className="h-5 w-5 text-foreground/80 mt-0.5" />
+                  <div className="flex-1 space-y-2">
+                    <h3 className="font-medium text-sm">Utilisateurs</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Invitez et gérez les membres de votre équipe.
+                    </p>
+                    <Button
+                      onClick={() => navigate("/users")}
+                      variant="outline"
+                      className="w-full gap-2"
+                    >
+                      <Users className="h-4 w-4" />
+                      Gérer les utilisateurs
                     </Button>
                   </div>
                 </div>

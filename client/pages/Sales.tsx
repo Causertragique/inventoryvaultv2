@@ -271,7 +271,7 @@ export default function Sales() {
     null,
   );
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [] = useState(false);
+  const tabsEnabled = false;
   const [openTabs, setOpenTabs] = useState<Tab[]>([]);
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
   const [showNewTabDialog, setShowNewTabDialog] = useState(false);
@@ -290,7 +290,6 @@ export default function Sales() {
   const [inventoryProducts, setInventoryProducts] = useState<Product[]>([]);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [] = useState(true);
   const [tip, setTip] = useState(0);
   const [tipPercentage, setTipPercentage] = useState<number | null>(null);
   const [servingOverrides, setServingOverrides] = useState<ServingOverrides>(() => loadServingOverrides());
@@ -1447,7 +1446,7 @@ export default function Sales() {
                 })}
               </div>
             ) : (
-              <div className="space-y-2 sm:space-y-3">
+              <div className="grid gap-2 sm:grid-cols-2">
                 {filteredProducts.map((product) => {
                   const isRecipe = 'ingredients' in product;
                   const availableQuantity = isRecipe 
@@ -1481,27 +1480,28 @@ export default function Sales() {
                         event.preventDefault();
                         addToCart(product);
                       }}
-                      className={`relative w-full p-3 sm:p-4 rounded-lg border-2 border-foreground/30 transition-all text-left flex flex-col gap-2 ${categoryColors[product.category]} ${
+                      className={`relative w-full rounded-lg border-2 border-foreground/30 transition-all bg-background flex items-center gap-3 px-3 py-2 sm:px-4 sm:py-3 text-left ${categoryColors[product.category]} ${
                         isOutOfStock ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
                       }`}
                     >
                       {renderProductActionIcons(product)}
-                      <div className="flex flex-col gap-1 min-h-[3rem]">
-                        <p className="font-bold text-sm sm:text-base line-clamp-1">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm sm:text-base line-clamp-2">
                           {title}
                         </p>
-                        <p className="text-xs text-muted-foreground min-h-[1rem]">
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
                           {(product as Recipe).saleType === "shot"
                             ? "Shot"
                             : containerLabel || "\u00A0"}
                         </p>
                       </div>
-                      <div className="h-2" aria-hidden="true" />
-                      <div className="flex items-center justify-between text-sm">
-                        <p className="font-semibold text-foreground text-base">
+                      <div className="flex flex-col items-end gap-0.5 text-sm">
+                        <span className="font-semibold text-base sm:text-lg text-foreground">
                           ${product.price.toFixed(2)}
-                        </p>
-                        <p className="text-[10px] opacity-60">{availabilityText}</p>
+                        </span>
+                        <span className="text-[10px] opacity-70">
+                          {availabilityText}
+                        </span>
                       </div>
                     </div>
                   );

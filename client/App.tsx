@@ -5,13 +5,13 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { I18nProvider } from "@/contexts/I18nContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
+import { Toaster } from "@/components/ui/toaster";
 
 // Lazy load pages for code splitting
 const Login = lazy(() => import("./pages/Login"));
 const Inventory = lazy(() => import("./pages/Inventory"));
 const Sales = lazy(() => import("./pages/Sales"));
 const Analytics = lazy(() => import("./pages/Analytics"));
-const Notifications = lazy(() => import("./pages/Notifications"));
 const Settings = lazy(() => import("./pages/Settings"));
 const AuditLogs = lazy(() => import("./pages/AuditLogs"));
 const UserManagement = lazy(() => import("./pages/UserManagement"));
@@ -69,14 +69,6 @@ export default function App() {
                     } 
                   />
                   <Route 
-                    path="/notifications" 
-                    element={
-                      <ProtectedRoute>
-                        <Notifications />
-                      </ProtectedRoute>
-                    } 
-                  />
-                  <Route 
                     path="/settings" 
                     element={
                       <ProtectedRoute>
@@ -107,6 +99,7 @@ export default function App() {
                 </Routes>
               </Suspense>
             </BrowserRouter>
+            <Toaster />
           </TooltipProvider>
         </QueryClientProvider>
       </I18nProvider>

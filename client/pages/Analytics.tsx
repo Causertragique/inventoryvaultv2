@@ -390,8 +390,20 @@ export default function Analytics() {
       const productsSnapshot = await getDocs(productsRef);
       const inventory = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+      // Récupérer le profil du bar pour connaître la région de taxes
+      let barProfile: any = {};
+      const settingsStr = localStorage.getItem("bartender-settings");
+      if (settingsStr) {
+        try {
+          barProfile = JSON.parse(settingsStr);
+        } catch (error) {
+          console.error("[Analytics] Erreur parsing settings:", error);
+        }
+      }
+      const region = barProfile?.taxRegion || "quebec";
+
       // Construire le rapport
-      const report = generateSalesReport(sales, inventory);
+      const report = generateSalesReport(sales, inventory, region);
       setSalesReport(report);
       saveToCache("sales-report", report);
     } catch (error: any) {
@@ -418,16 +430,33 @@ export default function Analytics() {
   };
 
   // Fonction pour générer le rapport détaillé
-  const generateSalesReport = (sales: any[], inventory: any[]) => {
+  const generateSalesReport = (sales: any[], inventory: any[], region: string) => {
     const totalSales = sales.length;
     const totalRevenue = sales.reduce((sum: number, sale: any) => sum + (Number(sale.total) || 0), 0);
     const totalTips = sales.reduce((sum: number, sale: any) => sum + (Number(sale.tip) || 0), 0);
+
+    const computeQuebecTaxes = (subtotalValue: number) => {
+      const tps = subtotalValue * 0.05;
+      const tvq = (subtotalValue + tps) * 0.09975;
+      return { tps, tvq, total: tps + tvq };
+    };
     
     // Calculer les taxes correctement
     let totalTax = 0;
     let totalTPS = 0;
     let totalTVQ = 0;
     sales.forEach((sale: any) => {
+      const subtotalFromItems = Array.isArray(sale.items)
+        ? sale.items.reduce(
+            (sum: number, item: any) =>
+              sum + (Number(item.price) || 0) * (Number(item.quantity) || 1),
+            0,
+          )
+        : 0;
+      const saleSubtotalValue =
+        typeof sale.subtotal === "number" && Number.isFinite(sale.subtotal)
+          ? Number(sale.subtotal)
+          : subtotalFromItems;
       if (sale.breakdown) {
         // Si les taxes sont détaillées dans breakdown
         const tps = Number(sale.breakdown.tps) || 0;
@@ -435,6 +464,11 @@ export default function Analytics() {
         totalTPS += tps;
         totalTVQ += tvq;
         totalTax += tps + tvq;
+      } else if (region === "quebec" && saleSubtotalValue > 0) {
+        const computed = computeQuebecTaxes(saleSubtotalValue);
+        totalTPS += computed.tps;
+        totalTVQ += computed.tvq;
+        totalTax += computed.total;
       } else if (sale.tax) {
         // Sinon utiliser le champ tax (singulier)
         totalTax += Number(sale.tax) || 0;
@@ -461,11 +495,24 @@ export default function Analytics() {
       let saleTax = 0;
       let saleTPS = 0;
       let saleTVQ = 0;
+      const computedSubtotal = saleItems.reduce(
+        (sum: number, item: any) => sum + item.totalPrice,
+        0,
+      );
+      const saleSubtotal =
+        typeof sale.subtotal === "number" && Number.isFinite(sale.subtotal)
+          ? Number(sale.subtotal)
+          : computedSubtotal;
       
       if (sale.breakdown) {
         saleTPS = Number(sale.breakdown.tps) || 0;
         saleTVQ = Number(sale.breakdown.tvq) || 0;
         saleTax = saleTPS + saleTVQ;
+      } else if (region === "quebec" && saleSubtotal > 0) {
+        const computed = computeQuebecTaxes(saleSubtotal);
+        saleTPS = computed.tps;
+        saleTVQ = computed.tvq;
+        saleTax = computed.total;
       } else if (sale.tax) {
         saleTax = Number(sale.tax) || 0;
       } else if (sale.taxes) {
@@ -476,7 +523,7 @@ export default function Analytics() {
         id: sale.id,
         timestamp: sale.timestamp?.toDate?.() || sale.timestamp || new Date(),
         items: saleItems,
-        subtotal: saleItems.reduce((sum: number, item: any) => sum + item.totalPrice, 0),
+        subtotal: saleSubtotal,
         taxes: saleTax,
         tps: saleTPS,
         tvq: saleTVQ,
@@ -592,7 +639,7 @@ export default function Analytics() {
 
 
   const aiTools: Array<{ id: AITool; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>> }> = [
-    { id: "insights", label: "Insights généraux", icon: Eye },
+    { id: "insights", label: "Vue d'ensemble", icon: Eye },
     { id: "sales-prediction", label: "Meilleurs vendeurs", icon: TrendingUp },
     { id: "food-wine-pairing", label: "Accord mets-vin", icon: UtensilsCrossed },
     { id: "sales-report", label: "Rapport de ventes", icon: BarChart3 },
