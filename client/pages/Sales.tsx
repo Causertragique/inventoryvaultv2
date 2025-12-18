@@ -11,8 +11,9 @@ import { useToast } from "@/hooks/use-toast";
 import { updateProduct, getProducts } from "@/services/firestore/products";
 import { createRecipe, getRecipes } from "@/services/firestore/recipes";
 import { createSale } from "@/services/firestore/sales";
+import { createTabRecord, fetchOpenTabs, updateTabRecord } from "@/services/firestore/tabs";
 import { stockAlertsService } from "@/services/firestore/notifications";
-import type { FirestoreProduct } from "@shared/firestore-schema";
+import type { FirestoreProduct, FirestoreTab } from "@shared/firestore-schema";
 import {
   Dialog,
   DialogContent,
@@ -271,6 +272,7 @@ export default function Sales() {
     null,
   );
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [] = useState(false);
   const [openTabs, setOpenTabs] = useState<Tab[]>([]);
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
   const [showNewTabDialog, setShowNewTabDialog] = useState(false);
@@ -427,6 +429,30 @@ export default function Sales() {
     };
 
     loadRecipes();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setOpenTabs([]);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadTabs = async () => {
+      try {
+        const tabs = await fetchOpenTabs(user.uid);
+        if (!isMounted) return;
+        setOpenTabs(tabs);
+      } catch (error) {
+        console.error("[Sales] Échec du chargement des comptes :", error);
+      }
+    };
+
+    loadTabs();
     return () => {
       isMounted = false;
     };
@@ -1153,9 +1179,17 @@ export default function Sales() {
     }
   };
 
-  const handleCreateNewTab = () => {
+  const handleCreateNewTab = async () => {
     if (!newTabName.trim()) {
       alert("Veuillez entrer un nom de compte");
+      return;
+    }
+    if (!user?.uid) {
+      toast({
+        title: "Action impossible",
+        description: "Connectez-vous pour ouvrir un compte.",
+        variant: "destructive",
+      });
       return;
     }
     
@@ -1171,27 +1205,47 @@ export default function Sales() {
       last4Digits = cleanedCard.slice(-4);
     }
     
-    const newTab: Tab = {
-      id: `tab-${Date.now()}`,
+    const tabItems = cart.map((item) => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      price: item.price,
+      cartQuantity: item.cartQuantity,
+      isRecipe: item.isRecipe,
+      userId: item.userId,
+    }));
+    
+    const payload: Omit<FirestoreTab, "id" | "createdAt" | "updatedAt"> = {
       name: newTabName.trim(),
       creditCard: last4Digits,
-      items: [...cart],
-      createdAt: new Date(),
+      items: tabItems,
       subtotal,
       tax,
       total,
-      status: "open", // New tabs are open
+      status: "open",
     };
     
-    setOpenTabs([...openTabs, newTab]);
-    setSelectedTabId(newTab.id);
-    alert(`${t.sales.tabCreated}: ${newTab.name}`);
-    setCart([]);
-    setPaymentMethod(null);
-    setNewTabName("");
-    setNewTabCreditCard("");
-    setShowNewTabDialog(false);
+    try {
+      const createdTab = await createTabRecord(user.uid, payload);
+      setOpenTabs((prevTabs) => [...prevTabs, createdTab as Tab]);
+      setSelectedTabId(createdTab.id);
+      alert(`${t.sales.tabCreated}: ${createdTab.name}`);
+      setCart([]);
+      setPaymentMethod(null);
+      setNewTabName("");
+      setNewTabCreditCard("");
+      setShowNewTabDialog(false);
+    } catch (error) {
+      console.error("[Sales] Echec de creation de compte :", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible d'ouvrir le compte. Reessayez.",
+        variant: "destructive",
+      });
+    }
   };
+
+
 
   const handlePayTab = (tabId: string) => {
     const tab = openTabs.find(t => t.id === tabId);
@@ -2589,8 +2643,6 @@ const VALID_SALE_CATEGORIES: Recipe["category"][] = [
   "cocktail",
 ];
 
-const typeRequiresContainerSelection = (type: ProductTypeOption | "") =>
-  Boolean(type && (CONTAINER_OPTIONS[type]?.length ?? 0));
 
 
 interface SellProductFormProps {

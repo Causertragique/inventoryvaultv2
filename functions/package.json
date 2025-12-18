@@ -1,0 +1,13 @@
+{
+  "name": "inventoryvault-functions",
+  "version": "0.0.1",
+  "private": true,
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "lint": "echo \"No Cloud Functions to lint\"",
+    "build": "echo \"No Cloud Functions to build\""
+  },
+  "dependencies": {}
+}

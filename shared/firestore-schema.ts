@@ -211,6 +211,27 @@ export interface FirestoreSale {
   timestamp: any;
 }
 
+export interface FirestoreTab {
+  id?: string;
+  name: string;
+  creditCard?: string;
+  items: {
+    id: string;
+    name: string;
+    category: string;
+    price: number;
+    cartQuantity: number;
+    isRecipe?: boolean;
+    userId?: string;
+  }[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  status: "open" | "paid";
+  createdAt?: any;
+  updatedAt?: any;
+}
+
 // Type pour le profil utilisateur (document dans la collection users)
 export interface FirestoreUserProfile {
   // Informations de base (obligatoires)

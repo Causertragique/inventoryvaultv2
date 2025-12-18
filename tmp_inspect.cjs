@@ -1,0 +1,10 @@
+const fs = require('fs');
+const path = require('path');
+const filePath = path.join('client', 'pages', 'Sales.tsx');
+const text = fs.readFileSync(filePath, 'utf8');
+const substring = 'alert("Veuillez entrer un';
+const start = text.indexOf(substring);
+const end = text.indexOf('\r\n', start);
+const line = text.slice(start, end);
+console.log(line);
+console.log(Array.from(line).map((char) => char.charCodeAt(0)));
