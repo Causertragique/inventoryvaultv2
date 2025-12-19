@@ -1,5 +1,5 @@
 import "dotenv/config";
-import express from "express";
+import express, { NextFunction, Request, Response } from "express";
 import cors from "cors";
 import {
   getSalesPrediction,
@@ -46,7 +46,12 @@ export function createServer() {
 
   // Middleware
   app.use(cors());
-  app.use(express.json());
+  const jsonParser = express.json({
+    verify: (req, _res, buf) => {
+      (req as Request & { rawBody?: string }).rawBody = buf.toString("utf-8");
+    },
+  });
+  app.use(jsonParser);
   app.use(express.urlencoded({ extended: true }));
 
   // Example API routes
@@ -107,6 +112,47 @@ export function createServer() {
   app.use("/api", (req, res) => {
     console.log(`[Express] 404 - Route not found: ${req.method} ${req.url}`);
     res.status(404).json({ error: "Route not found" });
+  });
+
+  const isJsonSyntaxError = (err: any): boolean => {
+    return (
+      err &&
+      err instanceof SyntaxError &&
+      (err.type === "entity.parse.failed" || err.status === 400)
+    );
+  };
+
+  app.use(
+    (err: any, req: Request, res: Response, next: NextFunction) => {
+      if (res.headersSent) {
+        return next(err);
+      }
+      if (isJsonSyntaxError(err)) {
+        console.warn(`[Express] Invalid JSON payload: ${err.message}`);
+        const rawBody = (req as Request & { rawBody?: string }).rawBody;
+        if (rawBody) {
+          console.debug(
+            `[Express] Raw body (${rawBody.length} bytes): ${rawBody}`
+          );
+        }
+        return res.status(400).json({
+          error: "Invalid JSON payload",
+          message: err.message,
+        });
+      }
+      next(err);
+    }
+  );
+
+  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) {
+      return next(err);
+    }
+    console.error("[Express] Unhandled error:", err);
+    const status = err?.status || 500;
+    res.status(status).json({
+      error: err?.message || "Internal server error",
+    });
   });
 
   console.log("[Express] Toutes les routes configurées, retour de l'app");

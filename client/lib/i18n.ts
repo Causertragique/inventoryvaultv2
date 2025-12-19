@@ -194,6 +194,30 @@ export interface Translations {
     revenueReports: string;
     revenueReportsDesc: string;
     comingSoon: string;
+    salesPrediction: {
+      errorTitle: string;
+      retryButton: string;
+      retrying: string;
+      emptyMessage: string;
+      analyzeButton: string;
+      cardTitle: string;
+      forecastLabel: string;
+      unitsLabel: string;
+      unitPriceLabel: string;
+      dailyRevenueLabel: string;
+      marginLabel: string;
+      noProductDetails: string;
+    };
+    salesReport: {
+      dailyDetailTitle: string;
+      dailyDetailSubtitle: string;
+      dailyDetailEmpty: string;
+      dailyRevenueLabel: string;
+      dailySalesLabel: string;
+      dailyTipsLabel: string;
+      dailyTaxLabel: string;
+      downloadCsvButton: string;
+    };
   };
 
   // Audit Logs page
@@ -382,6 +406,18 @@ export interface Translations {
       description: string;
       theme: string;
       language: string;
+    };
+    auditLogsSection: {
+      title: string;
+      description: string;
+      details: string;
+      button: string;
+    };
+    userManagementSection: {
+      title: string;
+      description: string;
+      details: string;
+      button: string;
     };
     security: {
       title: string;
@@ -635,6 +671,30 @@ const translations: Record<Language, Translations> = {
       revenueReports: "Revenue Reports",
       revenueReportsDesc: "View detailed revenue breakdowns by category",
       comingSoon: "Analytics dashboard coming soon. Continue adding features to build out this section!",
+      salesPrediction: {
+        errorTitle: "Analysis error",
+        retryButton: "Retry",
+        retrying: "Retrying...",
+        emptyMessage: "Click the button to analyze the best sellers.",
+        analyzeButton: "Analyze sales",
+        cardTitle: "Top sellers by region",
+        forecastLabel: "Projected revenue (7 days)",
+        unitsLabel: "Units/day",
+        unitPriceLabel: "Unit price",
+        dailyRevenueLabel: "Daily revenue",
+        marginLabel: "Margin",
+        noProductDetails: "No product breakdowns yet."
+      },
+      salesReport: {
+        dailyDetailTitle: "Daily sales detail",
+        dailyDetailSubtitle: "Review how each day performed so you can spot trends.",
+        dailyDetailEmpty: "Generate a report to see daily totals.",
+        dailyRevenueLabel: "Revenue",
+        dailySalesLabel: "Sales",
+        dailyTipsLabel: "Tips",
+        dailyTaxLabel: "Taxes",
+        downloadCsvButton: "Download full report (CSV)",
+      },
     },
     auditLogs: {
       title: "Audit Logs",
@@ -813,6 +873,18 @@ const translations: Record<Language, Translations> = {
         description: "Customize the look and feel of the application",
         theme: "Theme",
         language: "Language",
+      },
+      auditLogsSection: {
+        title: "Audit Logs",
+        description: "Review inventory activity and suspicious alerts.",
+        details: "This log helps you trace changes, spot unusual edits, and keep compliance.",
+        button: "Open audit logs",
+      },
+      userManagementSection: {
+        title: "User Management",
+        description: "Invite team members, assign roles, and guard access.",
+        details: "Control who can edit inventory, view sales, or adjust settings.",
+        button: "Manage users",
       },
       security: {
         title: "Security and Data",
@@ -1060,6 +1132,30 @@ const translations: Record<Language, Translations> = {
       revenueReports: "Rapports de revenus",
       revenueReportsDesc: "Consultez les répartitions détaillées des revenus par catégorie",
       comingSoon: "Tableau de bord d'analyses à venir. Continuez à ajouter des fonctionnalités pour développer cette section !",
+      salesPrediction: {
+        errorTitle: "Erreur lors de l'analyse",
+        retryButton: "Réessayer",
+        retrying: "Réessai en cours...",
+        emptyMessage: "Cliquez sur le bouton pour analyser les meilleurs vendeurs.",
+        analyzeButton: "Analyser les ventes",
+        cardTitle: "Meilleurs vendeurs par région",
+        forecastLabel: "Revenu prévu (7 jours)",
+        unitsLabel: "Unités/jour",
+        unitPriceLabel: "Prix unitaire",
+        dailyRevenueLabel: "Revenu/jour",
+        marginLabel: "Marge",
+        noProductDetails: "Aucune ventilation produit disponible pour le moment."
+      },
+      salesReport: {
+        dailyDetailTitle: "Détail journalier des ventes",
+        dailyDetailSubtitle: "Consultez les totaux par jour pour suivre vos tendances.",
+        dailyDetailEmpty: "Générez un rapport pour afficher les totaux journaliers.",
+        dailyRevenueLabel: "Revenu",
+        dailySalesLabel: "Ventes",
+        dailyTipsLabel: "Pourboires",
+        dailyTaxLabel: "Taxes",
+        downloadCsvButton: "Télécharger le rapport complet (CSV)",
+      },
     },
     auditLogs: {
       title: "Logs d'audit",
@@ -1238,6 +1334,18 @@ const translations: Record<Language, Translations> = {
         description: "Personnalisez l'apparence de l'application",
         theme: "Thème",
         language: "Langue",
+      },
+      auditLogsSection: {
+        title: "Logs d'audit",
+        description: "Consultez les actions sur l'inventaire et les alertes suspectes.",
+        details: "Ce journal permet de retracer les modifications et de détecter les anomalies.",
+        button: "Voir les logs d'audit",
+      },
+      userManagementSection: {
+        title: "Gestion des utilisateurs",
+        description: "Invitez les membres de l'équipe, attribuez des rôles et contrôlez l'accès.",
+        details: "Choisissez qui peut modifier l'inventaire, consulter les ventes ou ajuster les paramètres.",
+        button: "Gérer les utilisateurs",
       },
       security: {
         title: "Sécurité et données",
@@ -1485,6 +1593,30 @@ const translations: Record<Language, Translations> = {
       revenueReports: "Informes de ingresos",
       revenueReportsDesc: "Ver desgloses detallados de ingresos por categoría",
       comingSoon: "Panel de análisis próximamente. ¡Continúa agregando funciones para desarrollar esta sección!",
+      salesPrediction: {
+        errorTitle: "Error en el análisis",
+        retryButton: "Reintentar",
+        retrying: "Reintentando...",
+        emptyMessage: "Haz clic en el botón para analizar los mejores vendedores.",
+        analyzeButton: "Analizar ventas",
+        cardTitle: "Mejores vendedores por región",
+        forecastLabel: "Ingresos proyectados (7 días)",
+        unitsLabel: "Unidades/día",
+        unitPriceLabel: "Precio por unidad",
+        dailyRevenueLabel: "Ingresos diarios",
+        marginLabel: "Margen",
+        noProductDetails: "No hay detalles de productos disponibles todavía."
+      },
+      salesReport: {
+        dailyDetailTitle: "Detalle diario de ventas",
+        dailyDetailSubtitle: "Consulta los totales de cada día para seguir la tendencia.",
+        dailyDetailEmpty: "Genera un informe para ver los resúmenes diarios.",
+        dailyRevenueLabel: "Ingresos",
+        dailySalesLabel: "Ventas",
+        dailyTipsLabel: "Propinas",
+        dailyTaxLabel: "Impuestos",
+        downloadCsvButton: "Descargar informe completo (CSV)",
+      },
     },
     auditLogs: {
       title: "Registros de auditoría",
@@ -1663,6 +1795,18 @@ const translations: Record<Language, Translations> = {
         description: "Personaliza la apariencia de la aplicación",
         theme: "Tema",
         language: "Idioma",
+      },
+      auditLogsSection: {
+        title: "Registros de auditoría",
+        description: "Revisa las acciones de inventario y alertas sospechosas.",
+        details: "Este registro te ayuda a rastrear cambios y detectar actividad inusual.",
+        button: "Ver registros de auditoría",
+      },
+      userManagementSection: {
+        title: "Gestión de usuarios",
+        description: "Invita al equipo, asigna roles y controla accesos.",
+        details: "Elige quién puede editar inventario, ver ventas o cambiar ajustes.",
+        button: "Administrar usuarios",
       },
       security: {
         title: "Seguridad y Datos",
@@ -1910,6 +2054,30 @@ const translations: Record<Language, Translations> = {
       revenueReports: "Umsatzberichte",
       revenueReportsDesc: "Detaillierte Umsatzaufschlüsselungen nach Kategorie anzeigen",
       comingSoon: "Analysedashboard kommt bald. Fügen Sie weiterhin Funktionen hinzu, um diesen Abschnitt zu entwickeln!",
+      salesPrediction: {
+        errorTitle: "Analysefehler",
+        retryButton: "Wiederholen",
+        retrying: "Wiederhole...",
+        emptyMessage: "Tippen Sie auf die Schaltfläche, um die Topseller zu analysieren.",
+        analyzeButton: "Verkäufe analysieren",
+        cardTitle: "Top Seller nach Region",
+        forecastLabel: "Prognostizierter Umsatz (7 Tage)",
+        unitsLabel: "Einheiten/Tag",
+        unitPriceLabel: "Stückpreis",
+        dailyRevenueLabel: "Täglicher Umsatz",
+        marginLabel: "Marge",
+        noProductDetails: "Noch keine Produktdetails verfügbar."
+      },
+      salesReport: {
+        dailyDetailTitle: "Tägliche Verkaufsdetails",
+        dailyDetailSubtitle: "Sieh dir die Tagessummen an, um Trends zu erkennen.",
+        dailyDetailEmpty: "Erstelle einen Bericht, um die Tagesdaten zu sehen.",
+        dailyRevenueLabel: "Umsatz",
+        dailySalesLabel: "Verkäufe",
+        dailyTipsLabel: "Trinkgelder",
+        dailyTaxLabel: "Steuern",
+        downloadCsvButton: "Kompletten Bericht herunterladen (CSV)",
+      },
     },
     auditLogs: {
       title: "Audit-Protokolle",
@@ -2088,6 +2256,18 @@ const translations: Record<Language, Translations> = {
         description: "Passen Sie das Aussehen und Verhalten der Anwendung an",
         theme: "Thema",
         language: "Sprache",
+      },
+      auditLogsSection: {
+        title: "Audit-Protokolle",
+        description: "Prüfen Sie Inventaraktionen und verdächtige Meldungen.",
+        details: "Dieses Protokoll hilft, Änderungen nachzuverfolgen und ungewöhnliche Aktivitäten zu erkennen.",
+        button: "Audit-Protokolle ansehen",
+      },
+      userManagementSection: {
+        title: "Benutzerverwaltung",
+        description: "Team einladen, Rollen vergeben und Zugänge steuern.",
+        details: "Bestimmen Sie, wer Inventar bearbeiten, Verkäufe einsehen oder Einstellungen ändern darf.",
+        button: "Benutzer verwalten",
       },
       security: {
         title: "Sicherheit und Daten",

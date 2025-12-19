@@ -25,9 +25,9 @@ dist-ssr
 
 .config/
 .env
-.env
 .env.local
 .env.*.local
+
 
 # Database
 data/

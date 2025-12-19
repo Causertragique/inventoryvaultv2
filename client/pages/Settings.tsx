@@ -72,6 +72,8 @@ export default function Settings() {
     appearance: false,
     importExport: false,
     stripe: false,
+    auditLogs: false,
+    userManagement: false,
     security: false,
   });
 
@@ -1934,9 +1936,89 @@ export default function Settings() {
                   et ne sont utilisées que pour vos propres transactions. Chaque utilisateur gère ses propres clés.
                 </p>
               </div>
-            </CardContent>
-          )}
-        </Card>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Audit Logs Section */}
+      <Card className="shadow-lg border-2 border-foreground/20">
+        <CardHeader
+          className="pb-3 cursor-pointer hover:bg-secondary/50 transition-colors"
+          onClick={() => toggleSection("auditLogs")}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <ShieldCheck className="h-4 w-4" />
+                {t.settings.auditLogsSection.title}
+              </CardTitle>
+              <CardDescription className="text-xs mt-1">
+                {t.settings.auditLogsSection.description}
+              </CardDescription>
+            </div>
+            {openSections.auditLogs ? (
+              <ChevronUp className="h-5 w-5 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+            )}
+          </div>
+        </CardHeader>
+        {openSections.auditLogs && (
+          <CardContent className="space-y-4 pt-0">
+            <p className="text-xs text-muted-foreground">
+              {t.settings.auditLogsSection.details}
+            </p>
+            <Button
+              onClick={() => navigate("/audit-logs")}
+              variant="outline"
+              className="w-full gap-2"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              {t.settings.auditLogsSection.button}
+            </Button>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* User Management Section */}
+      <Card className="shadow-lg border-2 border-foreground/20">
+        <CardHeader
+          className="pb-3 cursor-pointer hover:bg-secondary/50 transition-colors"
+          onClick={() => toggleSection("userManagement")}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Users className="h-4 w-4" />
+                {t.settings.userManagementSection.title}
+              </CardTitle>
+              <CardDescription className="text-xs mt-1">
+                {t.settings.userManagementSection.description}
+              </CardDescription>
+            </div>
+            {openSections.userManagement ? (
+              <ChevronUp className="h-5 w-5 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+            )}
+          </div>
+        </CardHeader>
+        {openSections.userManagement && (
+          <CardContent className="space-y-4 pt-0">
+            <p className="text-xs text-muted-foreground">
+              {t.settings.userManagementSection.details}
+            </p>
+            <Button
+              onClick={() => navigate("/users")}
+              variant="outline"
+              className="w-full gap-2"
+            >
+              <Users className="h-4 w-4" />
+              {t.settings.userManagementSection.button}
+            </Button>
+          </CardContent>
+        )}
+      </Card>
 
           {/* Security Section */}
           <Card className="shadow-lg border-2 border-foreground/20">
@@ -1980,48 +2062,6 @@ export default function Settings() {
                     >
                       <FileDown className="h-4 w-4" />
                       {isDownloadingData ? t.settings.security.downloading : t.settings.security.downloadButton}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Logs d'audit */}
-              <div className="space-y-3 p-4 bg-secondary/30 rounded-lg border-2 border-foreground/10">
-                <div className="flex items-start gap-3">
-                  <ShieldCheck className="h-5 w-5 text-foreground/80 mt-0.5" />
-                  <div className="flex-1 space-y-2">
-                    <h3 className="font-medium text-sm">Logs d'audit</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Consultez l'historique des actions sensibles sur l'inventaire.
-                    </p>
-                    <Button
-                      onClick={() => navigate("/audit-logs")}
-                      variant="outline"
-                      className="w-full gap-2"
-                    >
-                      <ShieldCheck className="h-4 w-4" />
-                      Voir les logs d'audit
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Gestion des utilisateurs */}
-              <div className="space-y-3 p-4 bg-secondary/30 rounded-lg border-2 border-foreground/10">
-                <div className="flex items-start gap-3">
-                  <Users className="h-5 w-5 text-foreground/80 mt-0.5" />
-                  <div className="flex-1 space-y-2">
-                    <h3 className="font-medium text-sm">Utilisateurs</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Invitez et gérez les membres de votre équipe.
-                    </p>
-                    <Button
-                      onClick={() => navigate("/users")}
-                      variant="outline"
-                      className="w-full gap-2"
-                    >
-                      <Users className="h-4 w-4" />
-                      Gérer les utilisateurs
                     </Button>
                   </div>
                 </div>

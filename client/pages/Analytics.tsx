@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Layout from "@/components/Layout";
 import { usei18n } from "@/contexts/I18nContext";
 import { collection, query, orderBy, limit, getDocs } from "firebase/firestore";
@@ -9,7 +9,6 @@ import {
   Lightbulb,
   Sparkles,
   Brain,
-  Eye,
   UtensilsCrossed,
   RefreshCw,
   AlertTriangle,
@@ -27,7 +26,7 @@ type AITool =
   | "sales-report";
 
 export default function Analytics() {
-  usei18n();
+  const { t } = usei18n();
   const [selectedTool, setSelectedTool] = useState<AITool>("insights");
   const [salesPrediction, setSalesPrediction] = useState<{
     topSellers: Array<{
@@ -60,6 +59,32 @@ export default function Analytics() {
   } | null>(null);
   const [foodWinePairing, setFoodWinePairing] = useState<any>(null);
   const [salesReport, setSalesReport] = useState<any>(null);
+  const productSummaries = useMemo(() => {
+    if (!salesReport?.detailedSales) return [];
+    const map = new Map<string, { productName: string; quantity: number; revenue: number; totalPrice: number; unitPrice: number }>();
+
+    for (const sale of salesReport.detailedSales) {
+      const items = Array.isArray(sale.items) ? sale.items : [];
+      for (const item of items) {
+        const key = item.productName || "Produit inconnu";
+        const entry = map.get(key) ?? {
+          productName: key,
+          quantity: 0,
+          revenue: 0,
+          totalPrice: 0,
+          unitPrice: item.unitPrice || 0,
+        };
+        entry.quantity += item.quantity || 0;
+        entry.totalPrice += item.totalPrice || (item.quantity || 0) * (item.unitPrice || 0);
+        entry.revenue += item.totalPrice || (item.quantity || 0) * (item.unitPrice || 0);
+        entry.unitPrice = item.unitPrice || entry.unitPrice || 0;
+        map.set(key, entry);
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
+  }, [salesReport]);
+  const [isIosDevice, setIsIosDevice] = useState(false);
     // États de chargement individuels pour chaque outil
   const [loadingTools, setLoadingTools] = useState<Record<AITool, boolean>>({
     "insights": false,
@@ -128,6 +153,13 @@ export default function Analytics() {
     if (cachedSalesReport) setSalesReport(cachedSalesReport);
     
     console.log("[Analytics] Données restaurées depuis le cache");
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const userAgent = window.navigator.userAgent || "";
+    const iosMatch = /iPad|iPhone|iPod/.test(userAgent);
+    setIsIosDevice(iosMatch);
   }, []);
 
   const getAuthToken = () => {
@@ -209,9 +241,20 @@ export default function Analytics() {
           setErrors(prev => ({ ...prev, "sales-prediction": "Aucune donnée générée. Vérifiez que vous avez des produits dans votre inventaire." }));
         }
       } else {
-        const errorData = await res.json().catch(() => ({ error: `Erreur ${res.status} du serveur` }));
-        console.error("[Analytics] Erreur serveur:", errorData);
-        setErrors(prev => ({ ...prev, "sales-prediction": errorData.error || errorData.message || `Erreur ${res.status} lors de la génération` }));
+        const errorText = await res.text().catch(() => "");
+        let parsedError: { error?: string; message?: string } = { error: errorText || `Erreur ${res.status} du serveur` };
+        if (errorText) {
+          try {
+            parsedError = JSON.parse(errorText);
+          } catch {
+            parsedError = { error: errorText };
+          }
+        }
+        console.error("[Analytics] Erreur serveur:", parsedError);
+        setErrors(prev => ({
+          ...prev,
+          "sales-prediction": parsedError.error || parsedError.message || `Erreur ${res.status} lors de la génération`,
+        }));
       }
     } catch (error: any) {
       console.error("Error fetching sales prediction:", error);
@@ -356,7 +399,7 @@ export default function Analytics() {
     } finally {
       setLoadingTools(prev => ({ ...prev, "food-wine-pairing": false }));
     }
-  };
+};
 
   const fetchSalesReport = async () => {
     console.log("[Analytics] fetchSalesReport appelé");
@@ -535,8 +578,51 @@ export default function Analytics() {
       };
     });
 
-    const averageSaleValue = totalRevenue / totalSales;
+    const averageSaleValue = totalSales > 0 ? totalRevenue / totalSales : 0;
     const avgTipPercentage = totalSales > 0 ? (totalTips / totalRevenue) * 100 : 0;
+
+    const dailyMap = new Map<
+      string,
+      {
+        dateKey: string;
+        label: string;
+        totalRevenue: number;
+        totalSales: number;
+        totalTips: number;
+        totalTax: number;
+      }
+    >();
+
+    detailedSales.forEach((sale: any) => {
+      const timestamp = new Date(sale.timestamp);
+      if (!Number.isFinite(timestamp.getTime())) return;
+      const dayKey = timestamp.toISOString().split("T")[0];
+      const existing = dailyMap.get(dayKey);
+      const label = timestamp.toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+
+      const entry = existing ?? {
+        dateKey: dayKey,
+        label,
+        totalRevenue: 0,
+        totalSales: 0,
+        totalTips: 0,
+        totalTax: 0,
+      };
+
+      entry.totalRevenue += Number(sale.total) || 0;
+      entry.totalSales += 1;
+      entry.totalTips += Number(sale.tip) || 0;
+      entry.totalTax += (Number(sale.tps) || 0) + (Number(sale.tvq) || 0);
+      dailyMap.set(dayKey, entry);
+    });
+
+    const dailyBreakdown = Array.from(dailyMap.values()).sort((a, b) =>
+      b.dateKey.localeCompare(a.dateKey),
+    );
 
     return {
       totalSales,
@@ -550,7 +636,91 @@ export default function Analytics() {
       detailedSales: detailedSales.sort((a: any, b: any) => 
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       ),
+      dailyBreakdown,
     };
+  };
+
+  const buildSalesReportCsv = (report: any): string | null => {
+    if (!report?.detailedSales?.length) return null;
+
+    const headers = [
+      "Date",
+      "Product",
+      "Category",
+      "Quantity",
+      "Unit Price",
+      "Line Total",
+      "TPS",
+      "TVQ",
+      "Tip",
+      "Total",
+      "Payment Method",
+    ];
+
+    const escapeCsvValue = (value: any) =>
+      `"${String(value ?? "").replace(/"/g, '""')}"`;
+
+    const rows: string[] = [];
+
+    report.detailedSales.forEach((sale: any) => {
+      const saleDate = new Date(sale.timestamp);
+      const formattedDate = saleDate.toLocaleString(undefined, {
+        dateStyle: "short",
+        timeStyle: "short",
+      });
+      const tps = Number(sale.tps) || 0;
+      const tvq = Number(sale.tvq) || 0;
+      const tip = Number(sale.tip) || 0;
+      const total = Number(sale.total) || 0;
+      const paymentMethod = formatPaymentMethod(sale);
+      const saleItems =
+        Array.isArray(sale.items) && sale.items.length > 0
+          ? sale.items
+          : [{ productName: "Produit inconnu", category: "other", quantity: 0, unitPrice: 0, totalPrice: 0 }];
+
+      saleItems.forEach((item: any) => {
+        const quantity = Number(item.quantity) || 0;
+        const unitPrice = Number(item.unitPrice) || 0;
+        const lineTotal = Number(item.totalPrice) || quantity * unitPrice;
+
+        rows.push(
+          [
+            formattedDate,
+            item.productName,
+            item.category,
+            quantity,
+            unitPrice.toFixed(2),
+            lineTotal.toFixed(2),
+            tps.toFixed(2),
+            tvq.toFixed(2),
+            tip.toFixed(2),
+            total.toFixed(2),
+            paymentMethod,
+          ]
+            .map(escapeCsvValue)
+            .join(","),
+        );
+      });
+    });
+
+    return [headers.join(","), ...rows].join("\n");
+  };
+
+  const downloadSalesReportCsv = () => {
+    if (!salesReport) return;
+    const csv = buildSalesReportCsv(salesReport);
+    if (!csv) return;
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const dateSegment = new Date().toISOString().split("T")[0];
+    link.download = `inventoryvault-sales-report-${dateSegment}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // Mapping des fonctions de fetch par outil
@@ -560,6 +730,38 @@ export default function Analytics() {
     "food-wine-pairing": fetchFoodWinePairing,
     "sales-report": fetchSalesReport,
   };
+
+  const aiToolOptions: Array<{
+    id: AITool;
+    title: string;
+    description: string;
+    icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  }> = [
+    {
+      id: "insights",
+      title: "Insights intelligents",
+      description: "Analyse des ventes récentes pour dégager des tendances clés.",
+      icon: Lightbulb,
+    },
+    {
+      id: "sales-prediction",
+      title: "Prévision des ventes",
+      description: "Estimez les meilleurs vendeurs et anticipez les stocks.",
+      icon: TrendingUp,
+    },
+    {
+      id: "food-wine-pairing",
+      title: "Accords mets-vins",
+      description: "Obtention d'idées d'accords entre vos vins et vos plats.",
+      icon: UtensilsCrossed,
+    },
+    {
+      id: "sales-report",
+      title: "Rapport de ventes",
+      description: "Obtenez un rapport détaillé avec statistiques et taxes.",
+      icon: BarChart3,
+    },
+  ];
 
   // Vérifier que toutes les fonctions sont définies
   console.log("[Analytics] Fonctions disponibles:", Object.keys(fetchFunctions));
@@ -623,8 +825,8 @@ export default function Analytics() {
         }}
         disabled={loadingTools[toolId]}
       >
-        <RefreshCw className={cn("h-4 w-4 mr-2", loadingTools[toolId] && "animate-spin")} />
-        Régénérer
+        <RefreshCw className={cn("h-4 w-4", loadingTools[toolId] && "animate-spin")} />
+        <span className="sr-only">Régénérer</span>
       </Button>
     </div>
   );
@@ -638,58 +840,106 @@ export default function Analytics() {
   };
 
 
-  const aiTools: Array<{ id: AITool; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>> }> = [
-    { id: "insights", label: "Vue d'ensemble", icon: Eye },
-    { id: "sales-prediction", label: "Meilleurs vendeurs", icon: TrendingUp },
-    { id: "food-wine-pairing", label: "Accord mets-vin", icon: UtensilsCrossed },
-    { id: "sales-report", label: "Rapport de ventes", icon: BarChart3 },
-  ];
+  const formatCityLabel = (value?: string): string => {
+    if (!value) return "";
+    const segments = value
+      .split(",")
+      .map(part => part.trim())
+      .filter(Boolean);
+    return segments.slice(0, 4).join(", ");
+  };
+
+  const [barLocationLabel, setBarLocationLabel] = useState("");
+
+  useEffect(() => {
+    try {
+      const settingsStr = localStorage.getItem("bartender-settings");
+      if (settingsStr) {
+        const profile = JSON.parse(settingsStr);
+        const raw =
+          profile?.location ||
+          profile?.city ||
+          profile?.formattedAddress ||
+          profile?.address ||
+          "";
+        const label = formatCityLabel(raw) || raw;
+        if (label) setBarLocationLabel(label);
+      }
+    } catch (error) {
+      console.warn("[Analytics] Impossible de parser les settings pour la ville :", error);
+    }
+  }, []);
+
+
+  const toolsLayoutClass = cn(
+    "flex gap-2",
+    isIosDevice ? "flex-col h-screen" : "h-[calc(100vh-8rem)]"
+  );
+
+  const sidebarClass = cn(
+    "bg-card flex flex-col flex-shrink-0",
+    "h-fit", // S'adapte … la hauteur du contenu
+    "border border-foreground/10",
+    isIosDevice
+      ? "fixed inset-x-0 bottom-0 z-40 w-full rounded-t-lg border-t border-foreground/20 shadow-lg backdrop-blur"
+      : "w-64 rounded-lg"
+  );
+
+  const mainContentClass = cn(
+    "flex-1 overflow-y-auto space-y-6 pt-10",
+    isIosDevice && "pb-28"
+  );
+
 
   return (
     <Layout>
-      <div className="flex gap-4 h-[calc(100vh-8rem)]">
+      <div className={toolsLayoutClass}>
         {/* Sidebar */}
-        <div
-          className={cn(
-            "bg-card rounded-lg flex flex-col flex-shrink-0",
-            "h-fit", // S'adapte à la hauteur du contenu
-            "w-64"
-          )}
-        >
+        <div className={sidebarClass}>
           {/* Sidebar Header */}
-          <div className="p-4 border-b-2 border-foreground/20">
+          <div
+            className={cn(
+              "space-y-3 border-b-2 border-foreground/20 p-4",
+              isIosDevice && "hidden"
+            )}
+          >
             <div className="flex items-center gap-2 mt-2">
               <Brain className="h-7 w-7 text-primary" />
               <h2 className="text-2xl sm:text-2xl font-bold text-foreground">Outils IA</h2>
-              </div>
-        </div>
-
-          {/* Tools List */}
-          <div className="p-2 border-b-2 border-foreground/20">
-            <div className="space-y-1">
-              {aiTools.map((tool) => (
-                <button
-                  key={tool.id}
-                  onClick={() => {
-                    setSelectedTool(tool.id);
-                  }}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm font-medium",
-                    selectedTool === tool.id
-                      ? "bg-primary text-primary-foreground"
-                      : "text-foreground hover:bg-secondary"
-                  )}
-                >
-                  <tool.icon className="h-4 w-4" />
-                  <span>{tool.label}</span>
-                </button>
-              ))}
             </div>
           </div>
+          <div
+            className={cn(
+              "flex items-center justify-between gap-1 px-2 pb-4 pt-2",
+              isIosDevice && "px-4 pb-3 pt-3"
+            )}
+          >
+            {aiToolOptions.map(tool => {
+              const Icon = tool.icon;
+              const isActive = selectedTool === tool.id;
+              return (
+                <button
+                  key={tool.id}
+                  type="button"
+                  onClick={() => setSelectedTool(tool.id)}
+                  aria-pressed={isActive}
+                  aria-label={tool.title}
+                  className={cn(
+                    "flex-1 min-w-0 max-w-[60px] flex h-10 items-center justify-center rounded-lg border-2 transition-colors duration-150",
+                    isActive
+                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                      : "border-transparent bg-card/60 text-muted-foreground hover:border-foreground/30 hover:text-foreground hover:bg-foreground/5"
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                </button>
+              );
+            })}
           </div>
+        </div>
 
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto space-y-6 pt-16">
+        <div className={mainContentClass}>
 
           {selectedTool === "insights" ? (
             <>
@@ -753,32 +1003,61 @@ export default function Analytics() {
                   <RefreshButton toolId="insights" />
                   
                   {/* Tableau des métriques */}
-                  <div className="overflow-x-auto border border-foreground/20 rounded-lg mb-6">
-                    <table className="w-full text-sm">
-                      <thead className="bg-foreground/5 border-b border-foreground/20">
-                        <tr>
-                          <th className="px-4 py-3 text-left font-semibold">Métrique</th>
-                          <th className="px-4 py-3 text-left font-semibold">Valeur</th>
-                          <th className="px-4 py-3 text-left font-semibold">Tendance</th>
-                          <th className="px-4 py-3 text-left font-semibold">Description</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {insights.metrics.map((metric, index) => (
-                          <tr key={index} className="border-b border-foreground/10 hover:bg-foreground/5">
-                            <td className="px-4 py-3 font-semibold text-foreground">{metric.name}</td>
-                            <td className={cn(
-                              "px-4 py-3 font-bold text-base",
-                              metric.trend === "positive" && "text-green-600 dark:text-green-400",
-                              metric.trend === "negative" && "text-red-600 dark:text-red-400",
-                              metric.trend === "warning" && "text-orange-600 dark:text-orange-400",
-                              metric.trend === "neutral" && "text-foreground"
-                            )}>
+                  {!isIosDevice ? (
+                    <div className="overflow-x-auto border border-foreground/20 rounded-lg mb-6">
+                      <table className="w-full text-sm">
+                        <thead className="bg-foreground/5 border-b border-foreground/20">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-semibold">Métrique</th>
+                            <th className="px-4 py-3 text-left font-semibold">Valeur</th>
+                            <th className="px-4 py-3 text-left font-semibold">Tendance</th>
+                            <th className="px-4 py-3 text-left font-semibold">Description</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {insights.metrics.map((metric, index) => (
+                            <tr key={index} className="border-b border-foreground/10 hover:bg-foreground/5">
+                              <td className="px-4 py-3 font-semibold text-foreground">{metric.name}</td>
+                              <td className={cn(
+                                "px-4 py-3 font-bold text-base",
+                                metric.trend === "positive" && "text-green-600 dark:text-green-400",
+                                metric.trend === "negative" && "text-red-600 dark:text-red-400",
+                                metric.trend === "warning" && "text-orange-600 dark:text-orange-400",
+                                metric.trend === "neutral" && "text-foreground"
+                              )}>
+                                {metric.value}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={cn(
+                                  "px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap",
+                                  metric.trend === "positive" && "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300",
+                                  metric.trend === "negative" && "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300",
+                                  metric.trend === "warning" && "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300",
+                                  metric.trend === "neutral" && "bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300"
+                                )}>
+                                  {getTrendLabel(metric.trend)}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-muted-foreground">{metric.description}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 mb-6">
+                      {insights.metrics.map((metric, index) => (
+                        <Card key={index} className="border-2 border-foreground/10">
+                          <CardHeader>
+                            <CardTitle className="text-sm font-medium">{metric.name}</CardTitle>
+                          </CardHeader>
+                          <CardContent className="flex flex-col gap-2">
+                            <div className="text-3xl font-bold text-foreground">
                               {metric.value}
-                            </td>
-                            <td className="px-4 py-3">
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
                               <span className={cn(
-                                "px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap",
+                                "px-2 py-1 rounded-full font-semibold whitespace-nowrap",
                                 metric.trend === "positive" && "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300",
                                 metric.trend === "negative" && "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300",
                                 metric.trend === "warning" && "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300",
@@ -786,14 +1065,14 @@ export default function Analytics() {
                               )}>
                                 {getTrendLabel(metric.trend)}
                               </span>
-                            </td>
-                            <td className="px-4 py-3 text-xs text-muted-foreground">{metric.description}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  
+                              <span className="text-right">{metric.description}</span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+        </div>
+      )}
+
                   {/* Summary Section si disponible */}
                   {insights.summary && (
                     <Card className="border-2 border-primary/20 bg-primary/5 mt-6">
@@ -882,7 +1161,9 @@ export default function Analytics() {
                 <Card className="border-2 border-destructive/50 bg-destructive/5">
                   <CardContent className="py-12 text-center">
                     <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-                    <p className="text-destructive font-semibold mb-2">Erreur lors de l'analyse</p>
+                    <p className="text-destructive font-semibold mb-2">
+                      {t.analytics.salesPrediction.errorTitle}
+                    </p>
                     <p className="text-muted-foreground text-sm mb-4">{errors["sales-prediction"]}</p>
                     <Button 
                       onClick={() => {
@@ -895,12 +1176,12 @@ export default function Analytics() {
                       {loadingTools["sales-prediction"] ? (
                         <>
                           <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
-                          Réessai en cours...
+                          {t.analytics.salesPrediction.retrying}
                         </>
                       ) : (
                         <>
                           <RefreshCw className="h-4 w-4 mr-2" />
-                          Réessayer
+                          {t.analytics.salesPrediction.retryButton}
                         </>
                       )}
                     </Button>
@@ -909,9 +1190,9 @@ export default function Analytics() {
               ) : !salesPrediction ? (
                 <EmptyStateWithButton
                   icon={TrendingUp}
-                  message="Cliquez sur le bouton pour analyser les meilleurs vendeurs."
+                  message={t.analytics.salesPrediction.emptyMessage}
                   toolId="sales-prediction"
-                  buttonLabel="Analyser les ventes"
+                  buttonLabel={t.analytics.salesPrediction.analyzeButton}
                 />
               ) : (
                 <>
@@ -921,10 +1202,10 @@ export default function Analytics() {
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           <TrendingUp className="h-5 w-5 text-primary" />
-                          Meilleurs vendeurs par région
-                          {salesPrediction.region && (
+                          {t.analytics.salesPrediction.cardTitle}
+                          {(barLocationLabel || salesPrediction.region) && (
                             <span className="text-sm font-normal text-muted-foreground">
-                              • {salesPrediction.region}
+                              {barLocationLabel || formatCityLabel(salesPrediction.region) || salesPrediction.region}
                             </span>
                           )}
                         </CardTitle>
@@ -934,7 +1215,7 @@ export default function Analytics() {
                           {/* Revenu prévu hebdomadaire */}
                           <div className="bg-secondary/50 rounded-lg p-4 mb-4">
                             <div className="text-sm text-muted-foreground">
-                              Revenu prévu (7 jours)
+                              {t.analytics.salesPrediction.forecastLabel}
                             </div>
                             <div className="text-3xl font-bold text-foreground mt-1">
                               ${(salesPrediction.totalPotentialWeeklyRevenue || 0).toFixed(2)}
@@ -959,34 +1240,39 @@ export default function Analytics() {
                                       <div className="font-semibold text-foreground text-lg">
                                         {seller.product}
                                       </div>
-                                      <span className="text-xs px-2 py-1 bg-primary/20 text-primary rounded">
-                                        {seller.category}
-                                      </span>
                                     </div>
                                     <div className="text-sm text-muted-foreground mb-3">
                                       {seller.reason}
                                     </div>
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                                       <div>
-                                        <span className="text-muted-foreground">Unités/jour:</span>
+                                        <span className="text-muted-foreground">
+                                          {t.analytics.salesPrediction.unitsLabel}
+                                        </span>
                                         <div className="font-semibold">
                                           {seller.estimatedDailyUnits}
                                         </div>
                                       </div>
                                       <div>
-                                        <span className="text-muted-foreground">Prix unitaire:</span>
+                                        <span className="text-muted-foreground">
+                                          {t.analytics.salesPrediction.unitPriceLabel}
+                                        </span>
                                         <div className="font-semibold">
                                           ${seller.estimatedUnitPrice.toFixed(2)}
                                         </div>
                                       </div>
                                       <div>
-                                        <span className="text-muted-foreground">Revenu/jour:</span>
+                                        <span className="text-muted-foreground">
+                                          {t.analytics.salesPrediction.dailyRevenueLabel}
+                                        </span>
                                         <div className="font-semibold text-green-600 dark:text-green-400">
                                           ${seller.estimatedDailyRevenue.toFixed(2)}
                                         </div>
                                       </div>
                                       <div>
-                                        <span className="text-muted-foreground">Marge:</span>
+                                        <span className="text-muted-foreground">
+                                          {t.analytics.salesPrediction.marginLabel}
+                                        </span>
                                         <div className="font-semibold">
                                           {seller.profitMargin}%
                                         </div>
@@ -1161,6 +1447,73 @@ export default function Analytics() {
                       </Card>
                     </div>
 
+                    <div className="space-y-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">
+                            {t.analytics.salesReport.dailyDetailTitle}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {t.analytics.salesReport.dailyDetailSubtitle}
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={downloadSalesReportCsv}
+                          disabled={!salesReport?.detailedSales?.length}
+                        >
+                          {t.analytics.salesReport.downloadCsvButton}
+                        </Button>
+                      </div>
+                      {salesReport?.dailyBreakdown?.length ? (
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                          {salesReport.dailyBreakdown.map((day: any) => (
+                            <Card
+                              key={day.dateKey}
+                              className="border-2 border-foreground/10 bg-secondary/10"
+                            >
+                              <CardHeader className="pb-1">
+                                <CardTitle className="text-sm font-semibold">
+                                  {day.label}
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="space-y-2 py-3 text-xs text-muted-foreground">
+                                <div className="flex items-center justify-between">
+                                  <span>{t.analytics.salesReport.dailySalesLabel}</span>
+                                  <span className="text-foreground font-semibold">
+                                    {day.totalSales}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span>{t.analytics.salesReport.dailyRevenueLabel}</span>
+                                  <span className="text-foreground font-semibold">
+                                    ${Number(day.totalRevenue || 0).toFixed(2)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span>{t.analytics.salesReport.dailyTipsLabel}</span>
+                                  <span className="text-blue-600 dark:text-blue-400 font-semibold">
+                                    ${Number(day.totalTips || 0).toFixed(2)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span>{t.analytics.salesReport.dailyTaxLabel}</span>
+                                  <span className="text-foreground font-semibold">
+                                    ${Number(day.totalTax || 0).toFixed(2)}
+                                  </span>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          {t.analytics.salesReport.dailyDetailEmpty}
+                        </p>
+                      )}
+                    </div>
+
                     {/* Détail des ventes - Format Tableau */}
                     <Card className="border-2 border-foreground/20">
                       <CardHeader>
@@ -1170,77 +1523,121 @@ export default function Analytics() {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b-2 border-foreground/20 bg-secondary/50">
-                                <th className="text-left px-4 py-3 font-semibold text-foreground">Heure</th>
-                                <th className="text-left px-4 py-3 font-semibold text-foreground">Produit</th>
-                                <th className="text-right px-4 py-3 font-semibold text-foreground">Quantité</th>
-                                <th className="text-right px-4 py-3 font-semibold text-foreground">Prix unitaire</th>
-                                <th className="text-right px-4 py-3 font-semibold text-foreground">Sous-total</th>
-                                <th className="text-right px-4 py-3 font-semibold text-foreground">TPS</th>
-                                <th className="text-right px-4 py-3 font-semibold text-foreground">TVQ</th>
-                                <th className="text-right px-4 py-3 font-semibold text-foreground">Pourboire</th>
-                                <th className="text-right px-4 py-3 font-semibold text-foreground">Total</th>
-                                <th className="text-left px-4 py-3 font-semibold text-foreground">Paiement</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {salesReport.detailedSales && salesReport.detailedSales.map((sale: any, saleIndex: number) => {
-                                const saleDate = new Date(sale.timestamp).toLocaleString('fr-FR', {
-                                  month: '2-digit',
-                                  day: '2-digit',
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                });
+                        {isIosDevice ? (
+                          <div className="space-y-3">
+                            {productSummaries.length === 0 && (
+                              <p className="text-sm text-muted-foreground">
+                                {t.analytics.salesPrediction.noProductDetails}
+                              </p>
+                            )}
+                            {productSummaries.map((product) => (
+                              <Card
+                                key={product.productName}
+                                className="border-2 border-foreground/10 bg-secondary/20"
+                              >
+                                <CardHeader>
+                                  <CardTitle className="text-base font-semibold">
+                                    {product.productName}
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2 py-3">
+                                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                                    <span>Total unités</span>
+                                    <span className="font-semibold">{product.quantity}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                                    <span>Revenu</span>
+                                    <span className="font-semibold">
+                                      ${product.revenue.toFixed(2)}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                                    <span>Prix moyen</span>
+                                    <span className="font-semibold">
+                                      ${(
+                                        product.quantity > 0
+                                          ? product.revenue / product.quantity
+                                          : product.unitPrice
+                                      ).toFixed(2)}
+                                    </span>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b-2 border-foreground/20 bg-secondary/50">
+                                  <th className="text-left px-4 py-3 font-semibold text-foreground">Heure</th>
+                                  <th className="text-left px-4 py-3 font-semibold text-foreground">Produit</th>
+                                  <th className="text-right px-4 py-3 font-semibold text-foreground">Quantité</th>
+                                  <th className="text-right px-4 py-3 font-semibold text-foreground">Prix unitaire</th>
+                                  <th className="text-right px-4 py-3 font-semibold text-foreground">Sous-total</th>
+                                  <th className="text-right px-4 py-3 font-semibold text-foreground">TPS</th>
+                                  <th className="text-right px-4 py-3 font-semibold text-foreground">TVQ</th>
+                                  <th className="text-right px-4 py-3 font-semibold text-foreground">Pourboire</th>
+                                  <th className="text-right px-4 py-3 font-semibold text-foreground">Total</th>
+                                  <th className="text-left px-4 py-3 font-semibold text-foreground">Paiement</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {salesReport.detailedSales && salesReport.detailedSales.map((sale: any, saleIndex: number) => {
+                                  const saleDate = new Date(sale.timestamp).toLocaleString('fr-FR', {
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  });
 
-                                return sale.items && sale.items.length > 0 ? (
-                                  sale.items.map((item: any, itemIndex: number) => (
-                                    <tr 
-                                      key={`${saleIndex}-${itemIndex}`}
-                                      className={`border-b border-foreground/10 hover:bg-secondary/30 transition ${itemIndex === 0 ? 'bg-secondary/10' : ''}`}
-                                    >
-                                      {itemIndex === 0 ? (
-                                        <>
-                                          <td className="px-4 py-3 text-muted-foreground font-medium">{saleDate}</td>
-                                          <td className="px-4 py-3 text-foreground">{item.productName}</td>
-                                          <td className="px-4 py-3 text-right text-foreground">{item.quantity}</td>
-                                          <td className="px-4 py-3 text-right text-foreground">${item.unitPrice.toFixed(2)}</td>
-                                          <td className="px-4 py-3 text-right text-foreground">${item.totalPrice.toFixed(2)}</td>
-                                          <td className="px-4 py-3 text-right font-semibold text-foreground">${sale.tps?.toFixed(2) || "0.00"}</td>
-                                          <td className="px-4 py-3 text-right font-semibold text-foreground">${sale.tvq?.toFixed(2) || "0.00"}</td>
-                                          <td className="px-4 py-3 text-right font-semibold text-blue-600 dark:text-blue-400">${sale.tip?.toFixed(2) || "0.00"}</td>
-                                          <td className="px-4 py-3 text-right font-bold text-green-600 dark:text-green-400">${sale.total?.toFixed(2) || "0.00"}</td>
-                                          <td className="px-4 py-3 text-foreground">{formatPaymentMethod(sale)}</td>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <td colSpan={1}></td>
-                                          <td className="px-4 py-3 text-foreground">{item.productName}</td>
-                                          <td className="px-4 py-3 text-right text-foreground">{item.quantity}</td>
-                                          <td className="px-4 py-3 text-right text-foreground">${item.unitPrice.toFixed(2)}</td>
-                                          <td className="px-4 py-3 text-right text-foreground">${item.totalPrice.toFixed(2)}</td>
-                                          <td colSpan={5}></td>
-                                        </>
-                                      )}
+                                  return sale.items && sale.items.length > 0 ? (
+                                    sale.items.map((item: any, itemIndex: number) => (
+                                      <tr 
+                                        key={`${saleIndex}-${itemIndex}`}
+                                        className={`border-b border-foreground/10 hover:bg-secondary/30 transition ${itemIndex === 0 ? 'bg-secondary/10' : ''}`}
+                                      >
+                                        {itemIndex === 0 ? (
+                                          <>
+                                            <td className="px-4 py-3 text-muted-foreground font-medium">{saleDate}</td>
+                                            <td className="px-4 py-3 text-foreground">{item.productName}</td>
+                                            <td className="px-4 py-3 text-right text-foreground">{item.quantity}</td>
+                                            <td className="px-4 py-3 text-right text-foreground">${item.unitPrice.toFixed(2)}</td>
+                                            <td className="px-4 py-3 text-right text-foreground">${item.totalPrice.toFixed(2)}</td>
+                                            <td className="px-4 py-3 text-right font-semibold text-foreground">${sale.tps?.toFixed(2) || "0.00"}</td>
+                                            <td className="px-4 py-3 text-right font-semibold text-foreground">${sale.tvq?.toFixed(2) || "0.00"}</td>
+                                            <td className="px-4 py-3 text-right font-semibold text-blue-600 dark:text-blue-400">${sale.tip?.toFixed(2) || "0.00"}</td>
+                                            <td className="px-4 py-3 text-right font-bold text-green-600 dark:text-green-400">${sale.total?.toFixed(2) || "0.00"}</td>
+                                            <td className="px-4 py-3 text-foreground">{formatPaymentMethod(sale)}</td>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <td colSpan={1}></td>
+                                            <td className="px-4 py-3 text-foreground">{item.productName}</td>
+                                            <td className="px-4 py-3 text-right text-foreground">{item.quantity}</td>
+                                            <td className="px-4 py-3 text-right text-foreground">${item.unitPrice.toFixed(2)}</td>
+                                            <td className="px-4 py-3 text-right text-foreground">${item.totalPrice.toFixed(2)}</td>
+                                            <td colSpan={5}></td>
+                                          </>
+                                        )}
+                                      </tr>
+                                    ))
+                                  ) : (
+                                    <tr key={saleIndex} className="border-b border-foreground/10 bg-secondary/10 hover:bg-secondary/30 transition">
+                                      <td className="px-4 py-3 text-muted-foreground font-medium">{saleDate}</td>
+                                      <td colSpan={4} className="px-4 py-3 text-muted-foreground italic">Aucun produit</td>
+                                      <td className="px-4 py-3 text-right font-semibold text-foreground">${sale.tps?.toFixed(2) || "0.00"}</td>
+                                      <td className="px-4 py-3 text-right font-semibold text-foreground">${sale.tvq?.toFixed(2) || "0.00"}</td>
+                                      <td className="px-4 py-3 text-right font-semibold text-blue-600 dark:text-blue-400">${sale.tip?.toFixed(2) || "0.00"}</td>
+                                      <td className="px-4 py-3 text-right font-bold text-green-600 dark:text-green-400">${sale.total?.toFixed(2) || "0.00"}</td>
+                                      <td className="px-4 py-3 text-foreground">{formatPaymentMethod(sale)}</td>
                                     </tr>
-                                  ))
-                                ) : (
-                                  <tr key={saleIndex} className="border-b border-foreground/10 bg-secondary/10 hover:bg-secondary/30 transition">
-                                    <td className="px-4 py-3 text-muted-foreground font-medium">{saleDate}</td>
-                                    <td colSpan={4} className="px-4 py-3 text-muted-foreground italic">Aucun produit</td>
-                                    <td className="px-4 py-3 text-right font-semibold text-foreground">${sale.tps?.toFixed(2) || "0.00"}</td>
-                                    <td className="px-4 py-3 text-right font-semibold text-foreground">${sale.tvq?.toFixed(2) || "0.00"}</td>
-                                    <td className="px-4 py-3 text-right font-semibold text-blue-600 dark:text-blue-400">${sale.tip?.toFixed(2) || "0.00"}</td>
-                                    <td className="px-4 py-3 text-right font-bold text-green-600 dark:text-green-400">${sale.total?.toFixed(2) || "0.00"}</td>
-                                    <td className="px-4 py-3 text-foreground">{formatPaymentMethod(sale)}</td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </div>
