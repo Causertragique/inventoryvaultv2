@@ -1,17 +1,20 @@
 {
   "expo": {
     "name": "Bartender",
-    "slug": "bartender",
+    "slug": "inventoryvaultv2",
     "extra": {
       "eas": {
-        "projectId": "34352a23-735b-47dc-8614-c8890ed0d191"
+        "projectId": "9e2a7d03-59d6-4d5c-8863-d8cce7e45b2a"
       }
     },
     "ios": {
-      "bundleIdentifier": "y",
+      "bundleIdentifier": "com.inventoryvault.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
+    },
+    "android": {
+      "package": "com.guillaumehetu12.inventoryvaultv2"
     }
   }
 }
