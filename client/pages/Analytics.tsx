@@ -85,6 +85,7 @@ export default function Analytics() {
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
   }, [salesReport]);
   const [isIosDevice, setIsIosDevice] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(false);
     // États de chargement individuels pour chaque outil
   const [loadingTools, setLoadingTools] = useState<Record<AITool, boolean>>({
     "insights": false,
@@ -160,6 +161,16 @@ export default function Analytics() {
     const userAgent = window.navigator.userAgent || "";
     const iosMatch = /iPad|iPhone|iPod/.test(userAgent);
     setIsIosDevice(iosMatch);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleResize = () => {
+      setIsMobileView(window.innerWidth <= 640);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const getAuthToken = () => {
@@ -813,24 +824,6 @@ export default function Analytics() {
     </Card>
   );
 
-  const RefreshButton = ({ toolId }: { toolId: AITool }) => (
-    <div className="flex justify-end mb-4">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => {
-          if (fetchFunctions[toolId]) {
-            fetchFunctions[toolId]();
-          }
-        }}
-        disabled={loadingTools[toolId]}
-      >
-        <RefreshCw className={cn("h-4 w-4", loadingTools[toolId] && "animate-spin")} />
-        <span className="sr-only">Régénérer</span>
-      </Button>
-    </div>
-  );
-
   const getTrendLabel = (trend: string): string => {
     if (trend === "positive") return "↑ Positif";
     if (trend === "negative") return "↓ Négatif";
@@ -871,76 +864,61 @@ export default function Analytics() {
   }, []);
 
 
-  const toolsLayoutClass = cn(
-    "flex gap-2",
-    isIosDevice ? "flex-col h-screen" : "h-[calc(100vh-8rem)]"
-  );
-
-  const sidebarClass = cn(
-    "bg-card flex flex-col flex-shrink-0",
-    "h-fit", // S'adapte … la hauteur du contenu
-    "border border-foreground/10",
-    isIosDevice
-      ? "fixed inset-x-0 bottom-0 z-40 w-full rounded-t-lg border-t border-foreground/20 shadow-lg backdrop-blur"
-      : "w-64 rounded-lg"
-  );
-
-  const mainContentClass = cn(
-    "flex-1 overflow-y-auto space-y-6 pt-10",
-    isIosDevice && "pb-28"
-  );
-
-
   return (
     <Layout>
-      <div className={toolsLayoutClass}>
-        {/* Sidebar */}
-        <div className={sidebarClass}>
-          {/* Sidebar Header */}
-          <div
-            className={cn(
-              "space-y-3 border-b-2 border-foreground/20 p-4",
-              isIosDevice && "hidden"
-            )}
-          >
-            <div className="flex items-center gap-2 mt-2">
-              <Brain className="h-7 w-7 text-primary" />
-              <h2 className="text-2xl sm:text-2xl font-bold text-foreground">Outils IA</h2>
+      <div className="space-y-6 pb-10">
+        <section className="bg-card border border-foreground/10 rounded-lg p-6 shadow-sm">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Brain className="h-7 w-7 text-primary" />
+                <h2 className="text-2xl sm:text-2xl font-bold text-foreground">Outils IA</h2>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const toolFn = fetchFunctions[selectedTool];
+                  if (toolFn) toolFn();
+                }}
+                disabled={loadingTools[selectedTool]}
+                className="gap-2"
+              >
+                {loadingTools[selectedTool] ? (
+                  <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                <span className="sr-only">Régénérer</span>
+              </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {aiToolOptions.map(tool => {
+                const Icon = tool.icon;
+                const isActive = selectedTool === tool.id;
+                return (
+                  <button
+                    key={tool.id}
+                    type="button"
+                    onClick={() => setSelectedTool(tool.id)}
+                    aria-pressed={isActive}
+                    aria-label={tool.title}
+                    className={cn(
+                      "flex h-10 w-10 items-center justify-center rounded-lg border-2 transition-colors duration-150 text-muted-foreground",
+                      isActive
+                        ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                        : "border-transparent bg-card/60 hover:border-foreground/30 hover:text-foreground hover:bg-foreground/5"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </button>
+                );
+              })}
             </div>
           </div>
-          <div
-            className={cn(
-              "flex items-center justify-between gap-1 px-2 pb-4 pt-2",
-              isIosDevice && "px-4 pb-3 pt-3"
-            )}
-          >
-            {aiToolOptions.map(tool => {
-              const Icon = tool.icon;
-              const isActive = selectedTool === tool.id;
-              return (
-                <button
-                  key={tool.id}
-                  type="button"
-                  onClick={() => setSelectedTool(tool.id)}
-                  aria-pressed={isActive}
-                  aria-label={tool.title}
-                  className={cn(
-                    "flex-1 min-w-0 max-w-[60px] flex h-10 items-center justify-center rounded-lg border-2 transition-colors duration-150",
-                    isActive
-                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                      : "border-transparent bg-card/60 text-muted-foreground hover:border-foreground/30 hover:text-foreground hover:bg-foreground/5"
-                  )}
-                >
-                  <Icon className="h-5 w-5" />
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        </section>
 
-        {/* Main Content */}
-        <div className={mainContentClass}>
-
+        <div className={cn("space-y-6", isIosDevice && "pb-40")}>
           {selectedTool === "insights" ? (
             <>
               {/* Insights Cards */}
@@ -1000,10 +978,8 @@ export default function Analytics() {
               ) : insights && insights.metrics && insights.metrics.length > 0 ? (
                 <>
                   {console.log("[Analytics] Affichage des métriques, count:", insights.metrics?.length)}
-                  <RefreshButton toolId="insights" />
-                  
                   {/* Tableau des métriques */}
-                  {!isIosDevice ? (
+                  {!isMobileView ? (
                     <div className="overflow-x-auto border border-foreground/20 rounded-lg mb-6">
                       <table className="w-full text-sm">
                         <thead className="bg-foreground/5 border-b border-foreground/20">
@@ -1196,7 +1172,6 @@ export default function Analytics() {
                 />
               ) : (
                 <>
-                  <RefreshButton toolId="sales-prediction" />
                   <div className="space-y-4">
                     <Card className="border-2 border-foreground/20">
                       <CardHeader>
@@ -1330,7 +1305,6 @@ export default function Analytics() {
                 />
               ) : (
                 <>
-                  <RefreshButton toolId="food-wine-pairing" />
                   <Card className="border-2 border-foreground/20">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -1403,7 +1377,6 @@ export default function Analytics() {
                 />
               ) : (
                 <>
-                  <RefreshButton toolId="sales-report" />
                   <div className="space-y-4">
                     {/* Statistiques principales */}
                     <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
