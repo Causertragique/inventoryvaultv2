@@ -1,4 +1,8 @@
 // Structure des catégories et données de référence pour Firestore
+import { SubscriptionPlan } from "./subscription-plans";
+
+// Structure des catégories et données de référence pour Firestore
+
 export const PRODUCT_CATEGORIES = {
   spirits: {
     id: "spirits",
@@ -249,6 +253,8 @@ export interface FirestoreUserProfile {
   currency?: string;
   taxRegion?: string;
   taxRate?: number;
+  subscriptionPlan?: SubscriptionPlan;
+  employeeLimit?: number | null;
 
   // Profil AI - Personnalisation de l'établissement
   barType?: "casual" | "upscale" | "dive" | "sports" | "wine-bar" | "cocktail-lounge" | "nightclub" | "pub" | "bistro" | "restaurant-bar";

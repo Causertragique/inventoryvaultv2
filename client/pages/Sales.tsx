@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { JSX } from "react/jsx-runtime";
 interface CartItem extends Omit<Product, 'category'> {
   userId: string;
   category: "spirits" | "wine" | "beer" | "soda" | "juice" | "other" | "cocktail";
@@ -354,6 +355,12 @@ export default function Sales() {
   const [servingOverrides, setServingOverrides] = useState<ServingOverrides>(() => loadServingOverrides());
   const [showServingConfigDialog, setShowServingConfigDialog] = useState(false);
   const [draftOverrides, setDraftOverrides] = useState<ServingOverrides>({});
+  const getServingFormatLabel = (category: BaseCategory, format: ServingFormat) => {
+    return (
+      t.sales.servingConfig.formats?.[category]?.[format.labelKey] ??
+      format.fallbackLabel
+    );
+  };
   const glassItems = useMemo(
     () =>
       buildServingItems(
@@ -554,24 +561,6 @@ export default function Sales() {
     return unit; // Fallback to original if not found
   };
 
-  const getTranslatedContainerLabel = (type: ProductTypeOption | "", value: string): string | undefined => {
-    const option = findContainerOption(type, value);
-    if (!option) return undefined;
-    if (option.labelKey) {
-      const translated = t.sales.sellProductForm.containerOptions?.[option.labelKey];
-      if (translated) {
-        return translated;
-      }
-    }
-    return option.label;
-  };
-
-  const getServingFormatLabel = (category: BaseCategory, format: ServingFormat) => {
-    return (
-      t.sales.servingConfig.formats?.[category]?.[format.labelKey] ??
-      format.fallbackLabel
-    );
-  };
 
   // Combine inventory products (vendus au verre) et recettes
   const allProductsForSale: (Product | Recipe)[] = [
@@ -2614,13 +2603,6 @@ const CONTAINER_OPTIONS: Partial<Record<ProductTypeOption, ContainerOption[]>> =
 };
 
 
-const findContainerOption = (
-  type: ProductTypeOption | "",
-  value: string,
-): ContainerOption | undefined => {
-  if (!type) return undefined;
-  return CONTAINER_OPTIONS[type]?.find((opt) => opt.value === value);
-};
 
 const getDefaultServingForSelection = (
   type: ProductTypeOption | "",
@@ -3364,10 +3346,6 @@ const renderProductStep = () => {
     resetForm();
   };
 
-  const totalSteps = 3;
-  const stepIndicator = t.sales.sellProductForm.stepIndicator
-    .replace("{current}", String(step))
-    .replace("{total}", String(totalSteps));
 
   return (
     <div className="space-y-6">
@@ -3399,5 +3377,15 @@ const renderProductStep = () => {
       </DialogFooter>
     </div>
   );
+}
+function getTranslatedContainerLabel(selectedType: ProductTypeOption | "", selectedContainer: string): string | undefined {
+  if (!selectedType || !selectedContainer) return undefined;
+  const containerOptions = CONTAINER_OPTIONS[selectedType];
+  const option = containerOptions?.find(opt => opt.value === selectedContainer);
+  // Try translation from t.sales.sellProductForm.containerOptions if available
+  // Fallback to option.label or option.value
+  // Since t is only available in components, we can't use it here directly.
+  // So just return the label from the option.
+  return option?.label;
 }
 

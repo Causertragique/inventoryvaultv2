@@ -7,8 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { AlertCircle, RefreshCw, Shield, UserCog } from "lucide-react";
 import { usei18n } from "@/contexts/I18nContext";
 import { UserRole, ROLE_LABELS, hasPermission, getCurrentUserRole } from "@/lib/permissions";
-import { listUsers, updateUserRole, UserProfileWithId } from "@/services/firestore/users";
+import {
+  getUserProfile,
+  listUsers,
+  updateUserRole,
+  UserProfileWithId,
+} from "@/services/firestore/users";
 import { createInvite } from "@/services/firestore/invites";
+import { PLAN_DISPLAY_NAMES, getEmployeeLimit, SubscriptionPlan } from "@shared/subscription-plans";
 import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { isFirebaseConfigured } from "@/lib/firebase";
@@ -38,6 +44,17 @@ export default function UserManagement() {
     return labels?.[langKey] || labels?.en || role;
   };
 
+  const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan>("freemium");
+  const planLimit = getEmployeeLimit(currentPlan);
+  const planTitle = PLAN_DISPLAY_NAMES[currentPlan][language === "fr" ? "fr" : "en"];
+  const planLimitLabel = planLimit === null
+    ? language === "fr"
+      ? "Employés illimités"
+      : "Unlimited employees"
+    : language === "fr"
+      ? `${planLimit} employé${planLimit > 1 ? "s" : ""} max`
+      : `${planLimit} employee${planLimit > 1 ? "s" : ""} max`;
+
   const loadUsers = async () => {
     try {
       setLoading(true);
@@ -59,6 +76,21 @@ export default function UserManagement() {
     if (canManageUsers) {
       loadUsers();
     }
+  }, [canManageUsers]);
+
+  useEffect(() => {
+    const fetchPlan = async () => {
+      if (!canManageUsers || !isFirebaseConfigured() || !auth?.currentUser) return;
+      try {
+        const profile = await getUserProfile(auth.currentUser.uid);
+        if (profile?.subscriptionPlan) {
+          setCurrentPlan(profile.subscriptionPlan);
+        }
+      } catch (err) {
+        console.error("[UserManagement] Unable to load plan", err);
+      }
+    };
+    fetchPlan();
   }, [canManageUsers]);
 
   const handleRoleChange = async (userId: string, role: UserRole) => {
@@ -94,6 +126,20 @@ export default function UserManagement() {
     try {
       setInviteLoading(true);
       setInviteCode(null);
+      const employeesCount = users.filter((user) => (user.role || "employee") !== "owner").length;
+      const limit = getEmployeeLimit(currentPlan);
+      if (limit !== null && employeesCount >= limit) {
+        toast({
+          title: language === "fr" ? "Limite atteinte" : "Limit reached",
+          description:
+            language === "fr"
+              ? `Le plan ${planTitle} autorise ${limit} employé${limit > 1 ? "s" : ""}.`
+              : `The ${planTitle} plan allows ${limit} employees.`,
+          variant: "destructive",
+        });
+        setInviteLoading(false);
+        return;
+      }
       const invite = await createInvite(inviteRole, auth.currentUser.uid);
       setInviteCode(invite.code);
       toast({
@@ -149,6 +195,11 @@ export default function UserManagement() {
               {language === "fr"
                 ? "Assignez des rôles pour contrôler les permissions."
                 : "Assign roles to control permissions."}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {language === "fr"
+                ? `Plan actuel : ${planTitle} — ${planLimitLabel}`
+                : `Current plan: ${planTitle} — ${planLimitLabel}`}
             </p>
           </div>
           <Button variant="outline" onClick={loadUsers} disabled={loading}>

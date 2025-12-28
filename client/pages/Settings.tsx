@@ -58,6 +58,8 @@ import { FirestoreUserProfile } from "@shared/firestore-schema";
 import { useNavigate } from "react-router-dom";
 import { ROLE_LABELS, UserRole } from "@/lib/permissions";
 import { InviteEmployeeSection } from "@/components/InviteEmployeeSection";
+import { useToast } from "@/hooks/use-toast";
+import { SubscriptionPlan, getEmployeeLimit } from "@shared/subscription-plans";
 
 export default function Settings() {
   const { theme, setTheme } = useTheme();
@@ -83,6 +85,41 @@ export default function Settings() {
       [section]: !prev[section]
     }));
   };
+
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<"settings" | "plans">("settings");
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan>("freemium");
+
+  const pricingPlans: Array<{
+    id: SubscriptionPlan;
+    label: string;
+    price: string;
+    features: string[];
+    helper: string;
+  }> = [
+    {
+      id: "freemium",
+      label: "Freemium",
+      price: "0 $",
+      features: ["1 employé habilité", "5 requêtes mensuelles", "Export PDF"],
+      helper: "1 employé autorisé",
+    },
+    {
+      id: "pro",
+      label: "Pro",
+      price: "9,99 $ / mois (99 $ / an)",
+      features: ["5 employés simultanés", "50 requêtes/mois", "Exports PDF/CSV et notifications"],
+      helper: "5 employés max",
+    },
+    {
+      id: "premium",
+      label: "Premium",
+      price: "24,99 $ / mois (249 $ / an)",
+      features: ["Employés & requêtes illimités", "Support prioritaire", "Intégrations avancées"],
+      helper: "Employés illimités",
+    },
+  ];
+  const activePlan = pricingPlans.find((plan) => plan.id === selectedPlan);
 
   // Save button state
   const [isSaving, setIsSaving] = useState(false);
@@ -291,6 +328,8 @@ export default function Settings() {
             localStorage.setItem("bartender-user-role", roleToUse);
           }
           console.log("Paramètres chargés depuis Firestore");
+          const planFromFirestore = (userData.subscriptionPlan || "freemium") as SubscriptionPlan;
+          setSelectedPlan(planFromFirestore);
         } else {
           console.log("Aucun document utilisateur trouvé dans Firestore, utilisation des paramètres par défaut");
           const storedRole = getStoredRole();
@@ -490,6 +529,49 @@ export default function Settings() {
     setLanguage(newLanguage as "en" | "fr");
   };
 
+  const handlePlanSelection = async (planId: SubscriptionPlan) => {
+    setSelectedPlan(planId);
+    if (!isFirebaseConfigured() || !auth?.currentUser || !db) {
+      toast({
+        title: language === "fr" ? "Plan sélectionné" : "Plan selected",
+        description:
+          language === "fr"
+            ? "Le plan sera synchronisé une fois connecté à Firebase."
+            : "The plan will sync once connected to Firebase.",
+      });
+      return;
+    }
+    try {
+      const limit = getEmployeeLimit(planId);
+      await setDoc(
+        doc(db, "users", auth.currentUser.uid),
+        {
+          subscriptionPlan: planId,
+          employeeLimit: limit === null ? null : limit,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+      toast({
+        title: language === "fr" ? "Plan enregistré" : "Plan saved",
+        description:
+          language === "fr"
+            ? "La limite d’employés a été mise à jour."
+            : "Employee limit updated.",
+      });
+    } catch (error) {
+      console.error("[Settings] plan update error", error);
+      toast({
+        title: language === "fr" ? "Erreur" : "Error",
+        description:
+          language === "fr"
+            ? "Nous n'avons pas pu enregistrer le plan, réessayez."
+            : "We couldn’t save the plan, please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -515,6 +597,8 @@ export default function Settings() {
           currency: settings.currency,
           taxRegion: settings.taxRegion,
           taxRate: settings.taxRate,
+          subscriptionPlan: selectedPlan,
+          employeeLimit: getEmployeeLimit(selectedPlan),
           
           // Profil AI
           barType: settings.barType as FirestoreUserProfile["barType"],
@@ -974,7 +1058,29 @@ export default function Settings() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-3">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: "settings", label: "Réglages" },
+            { key: "plans", label: "Plans" },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key as "settings" | "plans")}
+              className={cn(
+                "px-3 py-1 rounded-full border transition-colors text-sm font-semibold",
+                tab.key === activeTab
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border bg-background text-muted-foreground"
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        {activeTab === "settings" ? (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-3">
           {/* General Settings */}
           <Card>
             <CardHeader 
@@ -2151,18 +2257,76 @@ export default function Settings() {
         
 
         </div>
-
-        {/* Privacy Policy Link */}
-        <div className="text-center pt-6 border-t-2 border-foreground/20">
-          <Link
-            to="/privacy-policy"
-            className="text-sm text-muted-foreground hover:text-foreground hover:underline transition-colors"
-          >
-            Politique de confidentialité
-          </Link>
+        </>
+      ) : (
+        <div className="space-y-6">
+          <Card className="shadow-lg border-2 border-border">
+            <CardHeader>
+              <CardTitle>Plan tarifaire</CardTitle>
+              <CardDescription>Choisissez le niveau qui correspond à votre équipe.</CardDescription>
+            </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              {language === "fr"
+                ? `Plan actuel : ${activePlan?.label || "Freemium"} — ${activePlan?.helper || ""}`
+                : `Current plan: ${activePlan?.label || "Freemium"} — ${activePlan?.helper || ""}`}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {pricingPlans.map((plan) => {
+                const isActive = selectedPlan === plan.id;
+                return (
+                  <div
+                    key={plan.id}
+                    className={`flex flex-col border rounded-lg p-4 gap-3 border-border bg-background shadow-sm ${
+                      isActive ? "border-foreground bg-foreground/5" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-lg font-semibold">{plan.label}</p>
+                      <span className="text-sm text-muted-foreground">{plan.price}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{plan.helper}</p>
+                    <ul className="space-y-1 text-sm text-muted-foreground">
+                      {plan.features.map((feature) => (
+                        <li key={feature}>• {feature}</li>
+                      ))}
+                    </ul>
+                    <Button
+                      variant={isActive ? "default" : "outline"}
+                      size="sm"
+                      className="mt-auto"
+                      onClick={() => handlePlanSelection(plan.id)}
+                      disabled={isActive}
+                    >
+                      {isActive
+                        ? language === "fr"
+                          ? "Plan actuel"
+                          : "Current plan"
+                        : language === "fr"
+                          ? `Passer à ${plan.label}`
+                          : `Upgrade to ${plan.label}`}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Les montées en gamme sont gérées via l’App Store Connect.
+            </p>
+          </CardContent>
+          </Card>
         </div>
+      )}
+      <div className="text-center pt-6 border-t-2 border-foreground/20">
+        <Link
+          to="/privacy-policy"
+          className="text-sm text-muted-foreground hover:text-foreground hover:underline transition-colors"
+        >
+          Politique de confidentialité
+        </Link>
       </div>
-    </Layout>
-  );
+    </div>
+  </Layout>
+);
 }
 

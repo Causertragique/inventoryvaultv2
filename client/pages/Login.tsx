@@ -11,6 +11,20 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { useToast } from "../hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { usei18n } from "@/contexts/I18nContext";
+import { Language } from "@/lib/i18n";
+
+const detectSystemLanguage = (): Language => {
+  if (typeof navigator === "undefined") return "en";
+  const candidates = navigator.languages ?? [navigator.language];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    if (candidate.toLowerCase().startsWith("fr")) {
+      return "fr";
+    }
+  }
+  return "en";
+};
 
 export default function Login() {
   const [isSignup, setIsSignup] = useState(false);
@@ -21,7 +35,36 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { language } = usei18n();
   const { user, loading: authLoading } = useAuth();
+  const [systemLanguage, setSystemLanguage] = useState<Language>(() => {
+    if (typeof navigator === "undefined") {
+      return language;
+    }
+
+    return detectSystemLanguage();
+  });
+  const [useSystemLanguage, setUseSystemLanguage] = useState(() => {
+    if (typeof window === "undefined") {
+      return true;
+    }
+    return localStorage.getItem("language") === null;
+  });
+
+  useEffect(() => {
+    if (typeof navigator !== "undefined") {
+      setSystemLanguage(detectSystemLanguage());
+    }
+
+    if (typeof window !== "undefined") {
+      setUseSystemLanguage(localStorage.getItem("language") === null);
+    }
+  }, []);
+
+  const displayLanguage = useSystemLanguage ? systemLanguage : language;
+  const title = displayLanguage === "en" ? "Inventory Vault" : "La Réserve";
+  const tagline =
+    displayLanguage === "en" ? "Manage your bar with style" : "Gérez votre bar avec style";
 
   useEffect(() => {
     if (!authLoading && user) {

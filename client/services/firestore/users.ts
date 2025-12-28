@@ -2,6 +2,7 @@ import { doc, setDoc, getDoc, getDocs, collection, Timestamp } from "firebase/fi
 import { db } from "../../lib/firestore";
 import type { User } from "firebase/auth";
 import { UserRole, normalizeUserRole } from "@/lib/permissions";
+import { SubscriptionPlan } from "@shared/subscription-plans";
 
 export interface UserProfile {
   uid: string;
@@ -9,6 +10,8 @@ export interface UserProfile {
   displayName: string | null;
   photoURL: string | null;
   role?: UserRole;
+  subscriptionPlan?: SubscriptionPlan;
+  employeeLimit?: number | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
