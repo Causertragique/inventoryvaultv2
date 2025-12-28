@@ -165,15 +165,24 @@ export default function Inventory() {
     "other",
   ];
 
-  const categoryLabels: Record<(typeof categories)[number], string> = {
-    all: t.inventory.allCategories || "Toutes",
-    spirits: t.inventory.spirits || "Spiritueux",
-    wine: t.inventory.wine || "Vins",
-    beer: t.inventory.beer || "Bières",
-    soda: t.inventory.soda || "Prêt-à-boire",
-    juice: t.inventory.juice || "Jus",
-    other: t.inventory.other || "Autres",
+  const fallbackCategoryLabels: Record<(typeof categories)[number], string> = {
+    all: "All Products",
+    spirits: "Spirits",
+    wine: "Wine",
+    beer: "Beer",
+    soda: "Soda",
+    juice: "Juice",
+    other: "Other",
   };
+
+  const categoryLabels: Record<(typeof categories)[number], string> = categories.reduce(
+    (acc, category) => {
+      const translated = t.inventory.categories?.[category];
+      acc[category] = translated && translated.trim().length > 0 ? translated : fallbackCategoryLabels[category];
+      return acc;
+    },
+    {} as Record<(typeof categories)[number], string>,
+  );
 
   const handleAddProduct = async (newProduct: Product) => {
     if (!user || !canAddProducts) return;

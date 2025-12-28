@@ -82,46 +82,103 @@ type BaseCategory = "spirits" | "wine" | "beer" | "soda" | "juice" | "other";
 
 interface ServingFormat {
   id: string;
-  label: string;
+  labelKey: string;
+  fallbackLabel: string;
   volumeMl: number;
   defaultMargin: number;
   defaultBottleMl?: number;
 }
 
 type ServingConfig = Record<BaseCategory, ServingFormat[]>;
-type ServingOverrides = Partial<Record<BaseCategory, Partial<Record<string, { margin: number }>>>>;
+type ServingOverrides = Partial<
+  Record<BaseCategory, Partial<Record<string, { margin: number }>>>
+>;
 
 const DEFAULT_SERVING_CONFIG: ServingConfig = {
   spirits: [
-    { id: "shot", label: "Shooter 1.5 oz", volumeMl: 44, defaultMargin: 200, defaultBottleMl: 750 },
-    { id: "double", label: "Double 3 oz", volumeMl: 88, defaultMargin: 180, defaultBottleMl: 750 },
+    {
+      id: "shot",
+      labelKey: "shot",
+      fallbackLabel: "Shooter 1.5 oz",
+      volumeMl: 44,
+      defaultMargin: 200,
+      defaultBottleMl: 750,
+    },
+    {
+      id: "double",
+      labelKey: "double",
+      fallbackLabel: "Double 3 oz",
+      volumeMl: 88,
+      defaultMargin: 180,
+      defaultBottleMl: 750,
+    },
   ],
   wine: [
-    { id: "white-glass", label: "Verre vin blanc 150 ml", volumeMl: 150, defaultMargin: 180, defaultBottleMl: 750 },
-    { id: "red-glass", label: "Verre vin rouge 180 ml", volumeMl: 180, defaultMargin: 200, defaultBottleMl: 750 },
+    {
+      id: "white-glass",
+      labelKey: "wine-white-glass",
+      fallbackLabel: "White wine glass 150 ml",
+      volumeMl: 150,
+      defaultMargin: 180,
+      defaultBottleMl: 750,
+    },
+    {
+      id: "red-glass",
+      labelKey: "wine-red-glass",
+      fallbackLabel: "Red wine glass 180 ml",
+      volumeMl: 180,
+      defaultMargin: 200,
+      defaultBottleMl: 750,
+    },
   ],
   beer: [
-    { id: "pint", label: "Pinte 473 ml", volumeMl: 473, defaultMargin: 150, defaultBottleMl: 473 },
-    { id: "bock", label: "Bock 355 ml", volumeMl: 355, defaultMargin: 140, defaultBottleMl: 355 },
+    {
+      id: "pint",
+      labelKey: "beer-pint",
+      fallbackLabel: "Pint 473 ml",
+      volumeMl: 473,
+      defaultMargin: 150,
+      defaultBottleMl: 473,
+    },
+    {
+      id: "bock",
+      labelKey: "beer-buck",
+      fallbackLabel: "Buck 355 ml",
+      volumeMl: 355,
+      defaultMargin: 140,
+      defaultBottleMl: 355,
+    },
   ],
   soda: [
-    { id: "rtb", label: "Prêt-à-boire 250 ml", volumeMl: 250, defaultMargin: 120, defaultBottleMl: 330 },
+    {
+      id: "rtb",
+      labelKey: "rtb",
+      fallbackLabel: "Ready-to-drink 250 ml",
+      volumeMl: 250,
+      defaultMargin: 120,
+      defaultBottleMl: 330,
+    },
   ],
   juice: [
-    { id: "glass", label: "Verre 250 ml", volumeMl: 250, defaultMargin: 120, defaultBottleMl: 330 },
+    {
+      id: "glass",
+      labelKey: "juice-glass",
+      fallbackLabel: "Glass 250 ml",
+      volumeMl: 250,
+      defaultMargin: 120,
+      defaultBottleMl: 330,
+    },
   ],
   other: [
-    { id: "portion", label: "Portion 200 ml", volumeMl: 200, defaultMargin: 150, defaultBottleMl: 330 },
+    {
+      id: "portion",
+      labelKey: "other-portion",
+      fallbackLabel: "Portion 200 ml",
+      volumeMl: 200,
+      defaultMargin: 150,
+      defaultBottleMl: 330,
+    },
   ],
-};
-
-const SERVING_CATEGORY_LABELS: Record<BaseCategory, string> = {
-  spirits: "Spiritueux",
-  wine: "Vins",
-  beer: "Bières",
-  soda: "Prêt-à-boire",
-  juice: "Jus",
-  other: "Autres",
 };
 
 const VALID_PRODUCT_CATEGORIES: Product["category"][] = [
@@ -217,7 +274,8 @@ const getFormatMargin = (
 
 const buildServingItems = (
   inventoryProducts: Product[],
-  overrides: ServingOverrides
+  overrides: ServingOverrides,
+  getLabel: (category: BaseCategory, format: ServingFormat) => string,
 ): Recipe[] => {
   return inventoryProducts
     .filter((product) => product.availableForSale !== false)
@@ -231,11 +289,12 @@ const buildServingItems = (
         const costPerServing = product.price / servingsPerBottle;
         const margin = getFormatMargin(baseCategory, format, overrides) / 100;
         const finalPrice = parseFloat((costPerServing * (1 + margin)).toFixed(2));
+        const formatLabel = getLabel(baseCategory, format);
         return {
           id: `${product.id}__${format.id}`,
-          name: `${product.name} (${format.label})`,
+          name: `${product.name} (${formatLabel})`,
           displayName: product.name,
-          containerLabel: format.label,
+          containerLabel: formatLabel,
           price: finalPrice,
           ingredients: [
             {
@@ -296,8 +355,13 @@ export default function Sales() {
   const [showServingConfigDialog, setShowServingConfigDialog] = useState(false);
   const [draftOverrides, setDraftOverrides] = useState<ServingOverrides>({});
   const glassItems = useMemo(
-    () => buildServingItems(inventoryProducts, servingOverrides),
-    [inventoryProducts, servingOverrides]
+    () =>
+      buildServingItems(
+        inventoryProducts,
+        servingOverrides,
+        getServingFormatLabel
+      ),
+    [inventoryProducts, servingOverrides, t.sales.servingConfig]
   );
 
 
@@ -321,11 +385,11 @@ export default function Sales() {
       <Layout>
         <div className="flex flex-col items-center justify-center min-h-[60vh]">
           <h2 className="text-2xl font-bold text-destructive mb-4">
-            {t.sales?.accessDenied || "Accès refusé"}
+            {t.sales?.accessDenied || "Access denied"}
           </h2>
           <p className="text-muted-foreground text-center max-w-md">
             {t.sales?.noSalesPermission ||
-              "Vous n'avez pas la permission d'effectuer des ventes avec ce rôle. Contactez un administrateur."}
+              "You do not have permission to process sales with this role. Contact an administrator."}
           </p>
         </div>
       </Layout>
@@ -389,7 +453,8 @@ export default function Sales() {
           const category = VALID_SALE_CATEGORIES.includes(firestoreRecipe.category as Recipe["category"])
             ? (firestoreRecipe.category as Recipe["category"])
             : "other";
-          const name = firestoreRecipe.name || "Produit de vente";
+          const name =
+            firestoreRecipe.name || t.sales.sellProductForm.saleDisplayNameFallback;
           return {
             id:
               firestoreRecipe.id ||
@@ -450,13 +515,13 @@ export default function Sales() {
   ];
   const categoriesObj = t.sales.categories as Record<string, string>;
   const categoryLabels = {
-    all: categoriesObj.all || "Tous",
-    spirits: categoriesObj.spirits || "Spiritueux",
-    wine: categoriesObj.wine || "Vin",
-    beer: categoriesObj.beer || "Bière",
-    soda: categoriesObj.soda || "Prêt-à-boire",
-    juice: categoriesObj.juice || "Jus",
-    other: categoriesObj.other || "Autres",
+    all: categoriesObj.all || "All",
+    spirits: categoriesObj.spirits || "Spirits",
+    wine: categoriesObj.wine || "Wine",
+    beer: categoriesObj.beer || "Beer",
+    soda: categoriesObj.soda || "Ready-to-drink",
+    juice: categoriesObj.juice || "Juice",
+    other: categoriesObj.other || "Other",
     cocktail: categoriesObj.cocktail || "Cocktails",
   };
 
@@ -487,6 +552,25 @@ export default function Sales() {
       return units.drink;
     }
     return unit; // Fallback to original if not found
+  };
+
+  const getTranslatedContainerLabel = (type: ProductTypeOption | "", value: string): string | undefined => {
+    const option = findContainerOption(type, value);
+    if (!option) return undefined;
+    if (option.labelKey) {
+      const translated = t.sales.sellProductForm.containerOptions?.[option.labelKey];
+      if (translated) {
+        return translated;
+      }
+    }
+    return option.label;
+  };
+
+  const getServingFormatLabel = (category: BaseCategory, format: ServingFormat) => {
+    return (
+      t.sales.servingConfig.formats?.[category]?.[format.labelKey] ??
+      format.fallbackLabel
+    );
   };
 
   // Combine inventory products (vendus au verre) et recettes
@@ -688,7 +772,7 @@ export default function Sales() {
     }
     if (
       !confirm(
-        `Masquer la carte de ${product.name} dans la page Ventes ? Cela n’effacera pas l’inventaire.`,
+        `Hide the card for ${product.name} on the Sales page? This will not erase the inventory.`,
       )
     )
       return;
@@ -1151,7 +1235,7 @@ export default function Sales() {
 
   const handleCreateNewTab = () => {
     if (!newTabName.trim()) {
-      alert("Veuillez entrer un nom de compte");
+      alert("Please enter a tab name");
       return;
     }
     
@@ -1160,7 +1244,7 @@ export default function Sales() {
     if (newTabCreditCard.trim()) {
       const cleanedCard = newTabCreditCard.replace(/\s+/g, "");
       if (cleanedCard.length < 13 || cleanedCard.length > 19 || !/^\d+$/.test(cleanedCard)) {
-        alert("Veuillez entrer un numéro de carte de crédit valide");
+        alert("Please enter a valid credit card number");
         return;
       }
       // Store only last 4 digits for security
@@ -1204,7 +1288,7 @@ export default function Sales() {
     
     // Prevent closing tab if it's still open (not paid)
     if (tab.status === "open") {
-      alert("Ce compte doit être payé avant de pouvoir le fermer");
+      alert("This tab must be paid before it can be closed");
       return;
     }
     
@@ -1322,7 +1406,7 @@ export default function Sales() {
               className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-primary text-primary-foreground rounded-lg font-bold transition-all hover:opacity-90 whitespace-nowrap text-sm sm:text-base"
             >
               <Wine className="h-4 w-4 sm:h-5 sm:w-5" />
-              + Produits (cocktail, au verres etc...)
+              {t.sales.sellProductCTA}
             </button>
             {tabsEnabled && openTabs.length > 0 && (
               <button
@@ -2190,14 +2274,18 @@ export default function Sales() {
           {/* Dropdown recette cocktail */}
           {filterCategory === "cocktail" && (
             <div className="mt-4">
-              <label htmlFor="cocktail-recipe-select" className="block text-sm font-medium text-foreground mb-1">Recette de cocktail</label>
+              <label
+                htmlFor="cocktail-recipe-select"
+                className="block text-sm font-medium text-foreground mb-1"
+              >
+                {t.sales.cocktailRecipeLabel}
+              </label>
               <select
                 id="cocktail-recipe-select"
                 className="w-full p-2 border rounded"
-                onChange={e => {
-                  const selectedRecipe = PRESET_RECIPES.find(r => r.name === e.target.value);
+                onChange={(e) => {
+                  const selectedRecipe = PRESET_RECIPES.find((r) => r.name === e.target.value);
                   if (selectedRecipe) {
-                    // Ajoute la recette au panier
                     addToCart({
                       id: selectedRecipe.name!,
                       name: selectedRecipe.name!,
@@ -2208,10 +2296,14 @@ export default function Sales() {
                   }
                 }}
               >
-                <option value="">Sélectionner une recette...</option>
-                {recipes.filter(r => r.category === "cocktail").map(r => (
-                  <option key={r.name} value={r.name}>{r.name}</option>
-                ))}
+                <option value="">{t.sales.cocktailRecipeSelectPlaceholder}</option>
+                {recipes
+                  .filter((r) => r.category === "cocktail")
+                  .map((r) => (
+                    <option key={r.name} value={r.name}>
+                      {r.name}
+                    </option>
+                  ))}
               </select>
             </div>
           )}
@@ -2223,10 +2315,10 @@ export default function Sales() {
           <DialogHeader className="pb-0">
             <DialogTitle className="flex items-center gap-2 text-lg">
               <Wine className="h-5 w-5" />
-              Ajouter un produit à la vente
+              {t.sales.sellProductDialogTitle}
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              Étapes 1 à 3 : type, contenant, produit. Les prix sont enregistrés à la base de données.
+              {t.sales.sellProductDialogDescription}
             </DialogDescription>
           </DialogHeader>
           <SellProductForm
@@ -2240,57 +2332,65 @@ export default function Sales() {
       </Dialog>
       <Dialog open={showServingConfigDialog} onOpenChange={setShowServingConfigDialog}>
         <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Formats & marges</DialogTitle>
-            <DialogDescription>
-              Ajustez la marge appliquée à chaque format de service (prix final = coût au verre × (1 + marge/100)).
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
-            {(Object.keys(DEFAULT_SERVING_CONFIG) as BaseCategory[]).map((category) => (
-              <div key={category} className="space-y-2">
-                <h4 className="text-sm font-semibold text-foreground uppercase tracking-wide">
-                  {SERVING_CATEGORY_LABELS[category]}
-                </h4>
-                <div className="space-y-2">
-                  {DEFAULT_SERVING_CONFIG[category].map((format) => {
-                    const marginValue =
-                      draftOverrides[category]?.[format.id]?.margin ?? format.defaultMargin;
-                    return (
-                      <div
-                        key={format.id}
-                        className="flex flex-col sm:flex-row sm:items-center gap-3 border border-border rounded-lg p-3"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm text-foreground">{format.label}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {format.volumeMl} ml • marge par défaut {format.defaultMargin}%
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            min={0}
-                            step={5}
-                            value={marginValue}
-                            onChange={(e) =>
-                              handleMarginDraftChange(
-                                category,
-                                format.id,
-                                Number(e.target.value) || 0
-                              )
-                            }
-                            className="w-24 text-right"
-                          />
-                          <span className="text-sm font-medium">%</span>
-                        </div>
+      <DialogHeader>
+        <DialogTitle>{t.sales.servingConfig.title}</DialogTitle>
+        <DialogDescription>
+          {t.sales.servingConfig.description}
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
+        {(Object.keys(DEFAULT_SERVING_CONFIG) as BaseCategory[]).map((category) => {
+          const categoryLabel =
+            t.sales.servingConfig.categoryLabels?.[category] ||
+            t.sales.categories?.[category] ||
+            category;
+          return (
+            <div key={category} className="space-y-2">
+              <h4 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                {categoryLabel}
+              </h4>
+              <div className="space-y-2">
+                {DEFAULT_SERVING_CONFIG[category].map((format) => {
+                  const marginValue =
+                    draftOverrides[category]?.[format.id]?.margin ?? format.defaultMargin;
+                  const formatLabel = getServingFormatLabel(category, format);
+                  const detailText = t.sales.servingConfig.formatDetails
+                    .replace("{volume}", String(format.volumeMl))
+                    .replace("{margin}", String(format.defaultMargin));
+                  return (
+                    <div
+                      key={format.id}
+                      className="flex flex-col sm:flex-row sm:items-center gap-3 border border-border rounded-lg p-3"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm text-foreground">{formatLabel}</p>
+                        <p className="text-xs text-muted-foreground">{detailText}</p>
                       </div>
-                    );
-                  })}
-                </div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          step={5}
+                          value={marginValue}
+                          onChange={(e) =>
+                            handleMarginDraftChange(
+                              category,
+                              format.id,
+                              Number(e.target.value) || 0
+                            )
+                          }
+                          className="w-24 text-right"
+                        />
+                        <span className="text-sm font-medium">%</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
+            </div>
+          );
+        })}
+      </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowServingConfigDialog(false)}>
               {t.common.cancel}
@@ -2421,6 +2521,7 @@ type ProductTypeOption = "wine" | "beer" | "shot" | "cocktail" | "other";
 type ContainerOption = {
   value: string;
   label: string;
+  labelKey?: string;
   defaultQuantity?: number;
   defaultUnit?: string;
 };
@@ -2439,30 +2540,86 @@ const PRODUCT_TYPE_OPTIONS: {
 
 const CONTAINER_OPTIONS: Partial<Record<ProductTypeOption, ContainerOption[]>> = {
   wine: [
-    { value: "wine-red-glass", label: "Verre vin rouge (180 ml)", defaultQuantity: 180, defaultUnit: "ml" },
-    { value: "wine-white-glass", label: "Verre vin blanc (150 ml)", defaultQuantity: 150, defaultUnit: "ml" },
-    { value: "wine-half-liter", label: "Demi-litre (500 ml)", defaultQuantity: 500, defaultUnit: "ml" },
-    { value: "wine-bottle", label: "Bouteille (750 ml)", defaultQuantity: 750, defaultUnit: "ml" },
+    {
+      value: "wine-red-glass",
+      labelKey: "wine-red-glass",
+      label: "Red wine glass (180 ml)",
+      defaultQuantity: 180,
+      defaultUnit: "ml",
+    },
+    {
+      value: "wine-white-glass",
+      labelKey: "wine-white-glass",
+      label: "White wine glass (150 ml)",
+      defaultQuantity: 150,
+      defaultUnit: "ml",
+    },
+    {
+      value: "wine-half-liter",
+      labelKey: "wine-half-liter",
+      label: "Half liter (500 ml)",
+      defaultQuantity: 500,
+      defaultUnit: "ml",
+    },
+    {
+      value: "wine-bottle",
+      labelKey: "wine-bottle",
+      label: "Bottle (750 ml)",
+      defaultQuantity: 750,
+      defaultUnit: "ml",
+    },
   ],
   beer: [
-    { value: "beer-bottle", label: "Bouteille (341 ml)", defaultQuantity: 341, defaultUnit: "ml" },
-    { value: "beer-glass", label: "Verre (355 ml)", defaultQuantity: 355, defaultUnit: "ml" },
-    { value: "beer-pint", label: "Pinte (473 ml)", defaultQuantity: 473, defaultUnit: "ml" },
-    { value: "beer-buck", label: "Buck (500 ml)", defaultQuantity: 500, defaultUnit: "ml" },
+    {
+      value: "beer-bottle",
+      labelKey: "beer-bottle",
+      label: "Bottle (341 ml)",
+      defaultQuantity: 341,
+      defaultUnit: "ml",
+    },
+    {
+      value: "beer-glass",
+      labelKey: "beer-glass",
+      label: "Glass (355 ml)",
+      defaultQuantity: 355,
+      defaultUnit: "ml",
+    },
+    {
+      value: "beer-pint",
+      labelKey: "beer-pint",
+      label: "Pint (473 ml)",
+      defaultQuantity: 473,
+      defaultUnit: "ml",
+    },
+    {
+      value: "beer-buck",
+      labelKey: "beer-buck",
+      label: "Buck (500 ml)",
+      defaultQuantity: 500,
+      defaultUnit: "ml",
+    },
   ],
   cocktail: [
-    { value: "cocktail-default-recipe", label: "Recette par défaut" },
-    { value: "cocktail-custom", label: "Recette maison" },
+    {
+      value: "cocktail-default-recipe",
+      labelKey: "cocktail-default-recipe",
+      label: "Default recipe",
+    },
+    {
+      value: "cocktail-custom",
+      labelKey: "cocktail-custom",
+      label: "Custom recipe",
+    },
   ],
 };
 
 
-const getContainerLabel = (
+const findContainerOption = (
   type: ProductTypeOption | "",
   value: string,
-): string | undefined => {
+): ContainerOption | undefined => {
   if (!type) return undefined;
-  return CONTAINER_OPTIONS[type]?.find((opt) => opt.value === value)?.label;
+  return CONTAINER_OPTIONS[type]?.find((opt) => opt.value === value);
 };
 
 const getDefaultServingForSelection = (
@@ -2582,6 +2739,7 @@ function SellProductForm({
   onCancel,
   translateUnit,
 }: SellProductFormProps): JSX.Element {
+  const { t } = usei18n();
   const [step, setStep] = useState(1);
   const [selectedType, setSelectedType] = useState<ProductTypeOption | "">("");
   const [selectedContainer, setSelectedContainer] = useState("");
@@ -2796,9 +2954,17 @@ function SellProductForm({
   }, [selectedType]);
 
   const getStepLabel = () => {
-    if (!selectedType) return "Type de produit";
-    const option = PRODUCT_TYPE_OPTIONS.find((item) => item.value === selectedType);
-    return option?.label || "Produit";
+    if (step === 1) {
+      const optionLabel =
+        selectedType && t.sales.sellProductForm.typeOptions[selectedType]
+          ? t.sales.sellProductForm.typeOptions[selectedType].label
+          : undefined;
+      if (optionLabel) return optionLabel;
+      const fallback = PRODUCT_TYPE_OPTIONS.find((item) => item.value === selectedType)?.label;
+      return fallback || t.sales.sellProductForm.typeStepTitle;
+    }
+    if (step === 2) return t.sales.sellProductForm.containerStepTitle;
+    return t.sales.sellProductForm.productStepTitle;
   };
 
   const canAdvance = (): boolean => {
@@ -2835,90 +3001,102 @@ function SellProductForm({
 
   const renderTypeStep = () => (
     <div className="space-y-3">
-      <Label className="text-base font-semibold">1. Type de produit</Label>
+      <Label className="text-base font-semibold">
+        {`1. ${t.sales.sellProductForm.typeStepTitle}`}
+      </Label>
       <p className="text-xs text-muted-foreground">
-        Choisissez la catégorie qui correspond au service (vin, bière, shot, cocktail ou autres).
+        {t.sales.sellProductForm.typeStepDescription}
       </p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {PRODUCT_TYPE_OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => handleSelectType(option.value)}
-            className={`p-3 border-2 rounded-lg text-left transition-all ${
-              selectedType === option.value
-                ? "border-primary bg-primary/10"
-                : "border-border hover:border-primary/50"
-            }`}
-          >
-            <div className="font-semibold">{option.label}</div>
-            <p className="text-xs text-muted-foreground">{option.helper}</p>
-          </button>
-        ))}
-      </div>
-      <div className="flex justify-end">
-        <Button onClick={handleNextStep} disabled={!selectedType}>
-          Suivant
-        </Button>
+        {PRODUCT_TYPE_OPTIONS.map((option) => {
+          const optionTranslation = t.sales.sellProductForm.typeOptions[option.value];
+          const label = optionTranslation?.label || option.label;
+          const helper = optionTranslation?.helper || option.helper;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => handleSelectType(option.value)}
+              className={`p-3 border-2 rounded-lg text-left transition-all ${
+                selectedType === option.value
+                  ? "border-primary bg-primary/10"
+                  : "border-border hover:border-primary/50"
+              }`}
+            >
+              <div className="font-semibold">{label}</div>
+              <p className="text-xs text-muted-foreground">{helper}</p>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 
   const renderContainerStep = () => (
     <div className="space-y-3">
-      <Label className="text-base font-semibold">2. Contenant</Label>
+      <Label className="text-base font-semibold">
+        {`2. ${t.sales.sellProductForm.containerStepTitle}`}
+      </Label>
       <p className="text-xs text-muted-foreground">
-        Sélectionnez le format ou le service qui sera vendu dans ce contenant.
+        {t.sales.sellProductForm.containerStepDescription}
       </p>
       {containerOptions?.length ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {containerOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => handleSelectContainer(option.value)}
-              className={`p-3 border-2 rounded-lg text-left transition-all ${
-                selectedContainer === option.value
-                  ? "border-primary bg-primary/10"
-                  : "border-border hover:border-primary/50"
-              }`}
-            >
-              <span className="font-semibold text-sm">{option.label}</span>
-            </button>
-          ))}
+          {containerOptions.map((option) => {
+            const labelKey = option.labelKey as keyof typeof t.sales.sellProductForm.containerOptions;
+            const label =
+              t.sales.sellProductForm.containerOptions?.[labelKey] ||
+              option.label ||
+              option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => handleSelectContainer(option.value)}
+                className={`p-3 border-2 rounded-lg text-left transition-all ${
+                  selectedContainer === option.value
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:border-primary/50"
+                }`}
+              >
+                <span className="font-semibold text-sm">{label}</span>
+              </button>
+            );
+          })}
         </div>
       ) : (
         <p className="text-xs text-muted-foreground">
-          Ce type utilise automatiquement un contenant standard.
+          {t.sales.sellProductForm.containerAutoMessage}
         </p>
       )}
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={() => setStep(1)}>
-          Étape précédente
-        </Button>
-        <Button onClick={handleNextStep} disabled={!canAdvance()}>
-          Suivant
-        </Button>
-      </div>
     </div>
   );
 
-  const inventoryOptions = inventoryProducts.map((product) => (
-    <option key={product.id} value={product.id}>
-      {product.name} • {translateUnit(product.unit)} • {product.quantity ?? 0} en stock
-    </option>
-  ));
+  const formatStockLabel = (count?: number) =>
+    t.sales.sellProductForm.stockCount.replace("{count}", String(count ?? 0));
 
-  const renderProductStep = () => {
+  const inventoryOptions = inventoryProducts.map((product) => {
+    const stockLabel = formatStockLabel(product.quantity);
+    return (
+      <option key={product.id} value={product.id}>
+        {product.name} • {translateUnit(product.unit)} • {stockLabel}
+      </option>
+    );
+  });
+
+const renderProductStep = () => {
     const containerLabel = selectedContainer
-      ? getContainerLabel(selectedType, selectedContainer)
+      ? getTranslatedContainerLabel(selectedType, selectedContainer) ?? ""
       : "";
     const bottleSize = selectedProduct ? getBottleSize(selectedProduct) : 0;
+    const inventoryGroups = t.sales.sellProductForm.inventoryGroups;
     return (
       <div className="space-y-3">
-        <Label className="text-base font-semibold">3. Produit</Label>
+        <Label className="text-base font-semibold">
+          {`3. ${t.sales.sellProductForm.productStepTitle}`}
+        </Label>
         <p className="text-xs text-muted-foreground">
-          Sélectionnez un article disponible dans l'inventaire filtré selon le type choisi.
+          {t.sales.sellProductForm.productStepDescription}
         </p>
         {!isMultiIngredientCocktail ? (
           <>
@@ -2934,21 +3112,21 @@ function SellProductForm({
                 }
               }}
             >
-              <option value="">Choisissez un produit</option>
+              <option value="">{t.sales.sellProductForm.selectProductPlaceholder}</option>
               {filteredInventory.length > 0 && (
-                <optgroup label="Inventaire compatible">
+                <optgroup label={inventoryGroups?.compatible || "Compatible inventory"}>
                   {filteredInventory.map((product) => (
                     <option key={product.id} value={product.id}>
-                      {product.name} • {translateUnit(product.unit)} • {product.quantity ?? 0} en stock
+                      {product.name} • {translateUnit(product.unit)} • {formatStockLabel(product.quantity)}
                     </option>
                   ))}
                 </optgroup>
               )}
               {otherInventory.length > 0 && (
-                <optgroup label="Autres produits inventaire">
+                <optgroup label={inventoryGroups?.other || "Other inventory"}>
                   {otherInventory.map((product) => (
                     <option key={product.id} value={product.id}>
-                      {product.name} • {translateUnit(product.unit)} • {product.quantity ?? 0} en stock
+                      {product.name} • {translateUnit(product.unit)} • {formatStockLabel(product.quantity)}
                     </option>
                   ))}
                 </optgroup>
@@ -2956,7 +3134,7 @@ function SellProductForm({
             </select>
             {filteredInventory.length === 0 && otherInventory.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                Aucun produit disponible pour ce type.
+                {t.sales.sellProductForm.noProductsAvailable}
               </p>
             )}
           </>
@@ -2964,7 +3142,9 @@ function SellProductForm({
           <div className="space-y-3">
             {isPresetCocktail && (
               <div className="space-y-1">
-                <Label className="text-sm font-semibold">Recette par défaut</Label>
+                <Label className="text-sm font-semibold">
+                  {t.sales.sellProductForm.presetRecipeLabel}
+                </Label>
                 <select
                   className="w-full p-2 border rounded-lg bg-background text-sm"
                   value={selectedPresetRecipeName}
@@ -2972,7 +3152,7 @@ function SellProductForm({
                     setSelectedPresetRecipeName(event.target.value);
                   }}
                 >
-                  <option value="">Sélectionnez une recette...</option>
+                  <option value="">{t.sales.sellProductForm.presetSelectPlaceholder}</option>
                   {presetCocktailRecipes.map((recipe) => (
                     <option key={recipe.name} value={recipe.name}>
                       {recipe.name}
@@ -2983,10 +3163,12 @@ function SellProductForm({
             )}
             {isCustomCocktail && (
               <div className="space-y-1">
-                <Label className="text-sm font-semibold">Nom du cocktail maison</Label>
+                <Label className="text-sm font-semibold">
+                  {t.sales.sellProductForm.customCocktailLabel}
+                </Label>
                 <Input
                   className="bg-white"
-                  placeholder="Nom du cocktail"
+                  placeholder={t.sales.sellProductForm.customCocktailPlaceholder}
                   value={customCocktailName}
                   onChange={(event) => setCustomCocktailName(event.target.value)}
                 />
@@ -2999,26 +3181,30 @@ function SellProductForm({
                     <div className="col-span-12">
                       <p className="text-[11px] text-muted-foreground">
                         {ingredient.referenceName
-                          ? `Recette : ${ingredient.referenceName}`
-                          : "Ingrédient personnalisé"}
+                          ? `${t.sales.sellProductForm.presetRecipeLabel} : ${ingredient.referenceName}`
+                          : t.sales.sellProductForm.ingredientCustomLabel}
                         {ingredient.quantity
-                          ? ` — ${ingredient.quantity} ${ingredient.unit}`
+                          ? ` - ${ingredient.quantity} ${ingredient.unit}`
                           : ""}
                       </p>
                     </div>
                     <div className="col-span-7 space-y-1">
-                      <Label className="text-xs font-semibold">Produit</Label>
+                      <Label className="text-xs font-semibold">
+                        {t.sales.sellProductForm.customIngredientProductLabel}
+                      </Label>
                       <select
                         className="w-full p-2 rounded border border-border text-sm"
                         value={ingredient.productId || ""}
                         onChange={(event) => handleCustomProductChange(ingredient.rowId, event.target.value)}
                       >
-                        <option value="">Choisissez un produit</option>
+                        <option value="">{t.sales.sellProductForm.selectProductPlaceholder}</option>
                         {inventoryOptions}
                       </select>
                     </div>
                     <div className="col-span-3 space-y-1">
-                      <Label className="text-xs font-semibold">Quantité (ml)</Label>
+                      <Label className="text-xs font-semibold">
+                        {t.sales.sellProductForm.customIngredientQuantityLabel}
+                      </Label>
                       <Input
                         type="number"
                         min="1"
@@ -3035,7 +3221,7 @@ function SellProductForm({
                         type="button"
                         onClick={() => removeCustomIngredientRow(ingredient.rowId)}
                         className="text-destructive hover:text-destructive/80"
-                        aria-label="Supprimer cet ingrédient"
+                        aria-label={t.sales.sellProductForm.customIngredientRemoveLabel}
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -3044,7 +3230,7 @@ function SellProductForm({
                 ),
               )}
               <Button variant="outline" onClick={addCustomIngredientRow}>
-                Ajouter un ingrédient
+                {t.sales.sellProductForm.addIngredientButton}
               </Button>
             </div>
           </div>
@@ -3052,18 +3238,25 @@ function SellProductForm({
         {estimatedCost !== null && (
           <div className="p-3 border rounded-lg bg-secondary/50 space-y-1 text-sm">
             <p className="font-semibold text-foreground">
-              Coût estimé du service : ${estimatedCost.toFixed(2)}
+              {t.sales.sellProductForm.estimatedCostLabel} : ${estimatedCost.toFixed(2)}
             </p>
             <p className="text-xs text-muted-foreground">
               {isMultiIngredientCocktail
-                ? `Basé sur ${customTotalVolume} ml total d'ingrédients.`
-                : `Basé sur ${servingVolume} ml/${bottleSize} ml de la bouteille.`}
+                ? t.sales.sellProductForm.estimatedCostDetailMulti.replace(
+                    "{totalVolume}",
+                    String(customTotalVolume),
+                  )
+                : t.sales.sellProductForm.estimatedCostDetailSingle
+                    .replace("{servingVolume}", String(servingVolume))
+                    .replace("{bottleSize}", String(bottleSize))}
             </p>
           </div>
         )}
         {estimatedCost !== null && (
           <div className="space-y-1">
-            <Label className="text-sm font-semibold">Marge de profit (%)</Label>
+            <Label className="text-sm font-semibold">
+              {t.sales.sellProductForm.profitMarginLabel}
+            </Label>
             <Input
               type="number"
               min="0"
@@ -3072,7 +3265,7 @@ function SellProductForm({
               onChange={(event) => setProfitMargin(Number(event.target.value))}
             />
             <p className="text-[11px] text-muted-foreground">
-              Le prix de vente suggéré serait{" "}
+              {t.sales.sellProductForm.profitMarginHint}{" "}
               {estimatedCost && profitMargin >= 0
                 ? `$${(estimatedCost * (1 + profitMargin / 100)).toFixed(2)}`
                 : "0.00"}
@@ -3081,7 +3274,7 @@ function SellProductForm({
           </div>
         )}
         <div className="space-y-1">
-          <Label className="text-sm font-semibold">Prix de vente</Label>
+          <Label className="text-sm font-semibold">{t.sales.sellProductForm.salePriceLabel}</Label>
           <Input
             placeholder="0.00"
             value={priceInput}
@@ -3090,7 +3283,7 @@ function SellProductForm({
           />
           {containerLabel && (
             <p className="text-xs text-muted-foreground">
-              Contenant choisi : {containerLabel}
+              {t.sales.sellProductForm.containerSelectedLabel.replace("{container}", containerLabel)}
             </p>
           )}
         </div>
@@ -3099,25 +3292,26 @@ function SellProductForm({
   };
 
   const handleSave = () => {
+    const errors = t.sales.sellProductForm.errors;
     if (!selectedType) {
-      alert("Choisissez un type de produit.");
+      alert(errors.typeRequired);
       return;
     }
     if (containerOptions?.length && !selectedContainer) {
-      alert("Sélectionnez un contenant.");
+      alert(errors.containerRequired);
       return;
     }
     const priceValue = parseFloat(priceInput.replace(",", "."));
     if (Number.isNaN(priceValue) || priceValue <= 0) {
-      alert("Entrez un prix valide.");
+      alert(errors.priceInvalid);
       return;
     }
     if (!selectedProduct && !isMultiIngredientCocktail) {
-      alert("Sélectionnez un produit de l'inventaire.");
+      alert(errors.productRequired);
       return;
     }
     const ingredientDefaults = getDefaultServingForSelection(selectedType, selectedContainer);
-    const containerLabel = getContainerLabel(selectedType, selectedContainer);
+    const resolvedContainerLabel = getTranslatedContainerLabel(selectedType, selectedContainer);
     let ingredients: RecipeIngredient[] = [];
     let name = "";
     if (isMultiIngredientCocktail) {
@@ -3130,14 +3324,14 @@ function SellProductForm({
           unit: ingredient.unit,
         }));
       if (validIngredients.length === 0) {
-        alert("Ajoutez au moins un ingrédient avec une quantité valide.");
+        alert(errors.ingredientRequired);
         return;
       }
       ingredients = validIngredients;
       name =
         customCocktailName ||
         selectedPresetRecipeName ||
-        "Cocktail maison";
+        t.sales.sellProductForm.customCocktailFallback;
     } else if (selectedProduct) {
       const quantity = ingredientDefaults.quantity || selectedProduct.quantity || 0;
       ingredients = [
@@ -3148,24 +3342,32 @@ function SellProductForm({
           unit: ingredientDefaults.unit || selectedProduct.unit,
         },
       ];
-      name = `${selectedProduct.name}${containerLabel ? ` - ${containerLabel}` : ""}`;
+      name = `${selectedProduct.name}${resolvedContainerLabel ? ` - ${resolvedContainerLabel}` : ""}`;
     }
     const recipe: Recipe = {
       id: `sell-${Date.now()}`,
       name,
-      displayName: name || selectedProduct?.name || "Produit de vente",
+      displayName:
+        name ||
+        selectedProduct?.name ||
+        t.sales.sellProductForm.saleDisplayNameFallback,
       price: priceValue,
       ingredients,
       category: mapProductTypeToCategory(selectedType),
       servingSize: isMultiIngredientCocktail
         ? customTotalVolume || undefined
         : ingredientDefaults.quantity,
-      containerLabel,
+      containerLabel: resolvedContainerLabel,
       saleType: selectedType,
     };
     onSave(recipe);
     resetForm();
   };
+
+  const totalSteps = 3;
+  const stepIndicator = t.sales.sellProductForm.stepIndicator
+    .replace("{current}", String(step))
+    .replace("{total}", String(totalSteps));
 
   return (
     <div className="space-y-6">
@@ -3178,20 +3380,20 @@ function SellProductForm({
       {step === 3 && renderProductStep()}
       <DialogFooter className="flex flex-wrap gap-2 justify-between">
         <Button variant="outline" onClick={onCancel}>
-          Annuler
+          {t.common.cancel}
         </Button>
         <div className="flex items-center gap-2">
-        {step > 1 && (
-          <Button variant="outline" onClick={() => setStep((prev) => Math.max(1, prev - 1))}>
-            Étape précédente
-          </Button>
-        )}
-        {step < 3 ? (
-          <Button onClick={handleNextStep} disabled={!canAdvance()}>
-            Suivant
-          </Button>
-        ) : (
-          <Button onClick={handleSave}>Enregistrer</Button>
+          {step > 1 && (
+            <Button variant="outline" onClick={() => setStep((prev) => Math.max(1, prev - 1))}>
+              {t.common.previous}
+            </Button>
+          )}
+          {step < 3 ? (
+            <Button onClick={handleNextStep} disabled={!canAdvance()}>
+              {t.common.next}
+            </Button>
+          ) : (
+            <Button onClick={handleSave}>{t.sales.sellProductForm.saveButton}</Button>
           )}
         </div>
       </DialogFooter>

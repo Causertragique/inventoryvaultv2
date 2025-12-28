@@ -60,6 +60,23 @@ const mapTaxRegionToRegion = (taxRegion: string): string => {
   return regionMap[taxRegion.toLowerCase()] || taxRegion || "Quebec";
 };
 
+const languageInstructionMap: Record<string, string> = {
+  en: "Respond in English. Return JSON only and keep the tone concise and professional.",
+  fr: "Réponds en français. Retourne uniquement du JSON et garde un ton professionnel et synthétique.",
+};
+
+const supportedLanguageCodes = Object.keys(languageInstructionMap);
+
+const normalizeLanguage = (lang?: string): string => {
+  if (!lang) return "en";
+  const code = lang.toLowerCase().split(/[-_]/)[0];
+  return supportedLanguageCodes.includes(code) ? code : "en";
+};
+
+const getLanguageInstruction = (lang?: string): string => {
+  return languageInstructionMap[normalizeLanguage(lang)];
+};
+
 // Implementation de getSalesPrediction pour obtenir les meilleurs produits à vendre pour augmenter CA
 export const getSalesPrediction: RequestHandler = async (req, res) => {
   try {
@@ -70,6 +87,8 @@ export const getSalesPrediction: RequestHandler = async (req, res) => {
       region = mapTaxRegionToRegion(region);
     }
     const barProfile = req.body.barProfile || {}; // Profil du bar envoyé par le client
+    const requestedLanguage = normalizeLanguage((req.body?.language as string) ?? undefined);
+    const languageInstruction = getLanguageInstruction(requestedLanguage);
     // Construire le contexte complet du bar si disponible
     let barContext = "";
     if (barProfile && Object.keys(barProfile).length > 0) {
@@ -108,7 +127,9 @@ export const getSalesPrediction: RequestHandler = async (req, res) => {
       barContext += `\n==========================================`;
     }
     
-    const prompt = `Tu es consultant en affaires pour bars au ${region}, Canada. Ta tâche est d'analyser les boissons et de recommander les 3 à 5 MEILLEURS produits qui génèrent le PLUS de REVENUS pour un bar.
+    const prompt = `${languageInstruction}
+
+Tu es consultant en affaires pour bars au ${region}, Canada. Ta tâche est d'analyser les boissons et de recommander les 3 à 5 MEILLEURS produits qui génèrent le PLUS de REVENUS pour un bar.
 ${barContext}
 
 INSTRUCTIONS CRITIQUES :
@@ -165,8 +186,16 @@ Retourne UNIQUEMENT cette structure JSON, sans autre texte :
         message: 'La clé API OpenAI n\'est pas configurée. Vérifiez OPENAI_API_KEY dans .env'
       });
     }
+
+    // Type assertion to avoid TS error on unknown
+    const aiResponse = response as {
+      topSellers?: any[];
+      totalPotentialWeeklyRevenue?: number;
+      regionInsight?: string;
+      [key: string]: any;
+    };
     
-    if (!response.topSellers || response.topSellers.length === 0) {
+    if (!aiResponse.topSellers || aiResponse.topSellers.length === 0) {
       return res.status(400).json({
         error: 'Invalid response from AI',
         message: 'Could not generate revenue recommendations'
@@ -174,7 +203,7 @@ Retourne UNIQUEMENT cette structure JSON, sans autre texte :
     }
 
     // Validate and ensure all numeric fields are present
-    const validatedSellers = response.topSellers.map((seller: any) => ({
+    const validatedSellers = aiResponse.topSellers.map((seller: any) => ({
       product: seller.product || 'Unknown Product',
       category: seller.category || 'other',
       reason: seller.reason || 'Popular in the region',
@@ -194,7 +223,7 @@ Retourne UNIQUEMENT cette structure JSON, sans autre texte :
     res.json({
       topSellers: validatedSellers,
       totalPotentialWeeklyRevenue,
-      regionInsight: response.regionInsight || `Key beverage trends in ${region}`,
+      regionInsight: aiResponse.regionInsight || `Key beverage trends in ${region}`,
       region
     });
   } catch (error) {
@@ -219,6 +248,8 @@ export const getFoodWinePairing: RequestHandler = async (req, res) => {
   try {
     const wines = req.body.wines || []; // Vins de l'inventaire envoyés par le client
     const barProfile = req.body.barProfile || {}; // Profil du bar
+    const requestedLanguage = normalizeLanguage((req.body?.language as string) ?? undefined);
+    const languageInstruction = getLanguageInstruction(requestedLanguage);
     
     if (!wines || wines.length === 0) {
       return res.status(400).json({
@@ -235,12 +266,7 @@ export const getFoodWinePairing: RequestHandler = async (req, res) => {
     // Construire le contexte complet du bar si disponible
     let barContext = "";
     if (barProfile && Object.keys(barProfile).length > 0) {
-      const currencySymbols: Record<string, string> = {
-        USD: "$", EUR: "€", GBP: "£", CAD: "$", AUD: "A$", MXN: "Mex$",
-        ARS: "$", CLP: "$", COP: "$", PEN: "S/", UYU: "$U", NZD: "NZ$", CHF: "CHF",
-      };
       
-      const currency = currencySymbols[barProfile.currency] || barProfile.currency || "$";
       
       barContext = `\n\n=== CONTEXTE DE L'ÉTABLISSEMENT ===`;
       barContext += `\n📍 ${barProfile.barName || 'Bar'}`;
@@ -264,7 +290,9 @@ export const getFoodWinePairing: RequestHandler = async (req, res) => {
       barContext += `\n===================================`;
     }
 
-    const prompt = `Tu es sommelier expert en accords mets-vins. Voici les vins disponibles dans l'inventaire du bar :
+    const prompt = `${languageInstruction}
+
+Tu es sommelier expert en accords mets-vins. Voici les vins disponibles dans l'inventaire du bar :
 
 ${wineList}
 ${barContext}
@@ -306,8 +334,16 @@ Structure JSON attendue :
 Retourne UNIQUEMENT le JSON, sans autre texte.`;
 
     const response = await callOpenAIJSON(prompt);
-    
-    if (!response || !response.pairings || response.pairings.length === 0) {
+
+    // Type assertion to avoid TS error on unknown
+    const aiResponse = response as {
+      pairings?: any[];
+      suggestions?: any[];
+      tip?: string;
+      [key: string]: any;
+    };
+
+    if (!aiResponse || !aiResponse.pairings || aiResponse.pairings.length === 0) {
       return res.status(400).json({
         error: 'Invalid response from AI',
         message: 'Could not generate wine pairings'
@@ -315,9 +351,9 @@ Retourne UNIQUEMENT le JSON, sans autre texte.`;
     }
 
     res.json({
-      pairings: response.pairings || [],
-      suggestions: response.suggestions || [],
-      tip: response.tip || 'Les accords mets-vins rehaussent l\'expérience culinaire de vos clients.',
+      pairings: aiResponse.pairings || [],
+      suggestions: aiResponse.suggestions || [],
+      tip: aiResponse.tip || 'Les accords mets-vins rehaussent l\'expérience culinaire de vos clients.',
       totalWinesAnalyzed: wines.length
     });
   } catch (error) {
@@ -333,8 +369,9 @@ Retourne UNIQUEMENT le JSON, sans autre texte.`;
 export const getInsights: RequestHandler = async (req, res) => {
   try {
     const sales = req.body.sales || []; // Ventes envoyées par le client
-    const inventory = req.body.inventory || []; // Inventaire envoyé par le client
     const barProfile = req.body.barProfile || {}; // Profil du bar
+    const requestedLanguage = normalizeLanguage((req.body?.language as string) ?? undefined);
+    const languageInstruction = getLanguageInstruction(requestedLanguage);
     
     if (!sales || sales.length === 0) {
       return res.status(400).json({
@@ -477,7 +514,9 @@ export const getInsights: RequestHandler = async (req, res) => {
       .map(([year, stats]) => `${year}: ${stats.sales} ventes, ${stats.revenue.toFixed(2)} $`)
       .join('\n');
 
-    const prompt = `Tu es consultant business expert pour bars et liquor stores. 
+    const prompt = `${languageInstruction}
+
+Tu es consultant business expert pour bars et liquor stores. 
 
 MÉTRIQUES ACTUELLES :
 - Marge nette: ${marginPercentage}%
@@ -568,7 +607,13 @@ Retourne UNIQUEMENT le JSON, sans autre texte.`;
       });
     }
     
-    if (!response.metrics || response.metrics.length === 0) {
+    const aiResponse = response as {
+      metrics?: any[];
+      summary?: any;
+      [key: string]: any;
+    };
+
+    if (!aiResponse.metrics || aiResponse.metrics.length === 0) {
       console.error('[getInsights] Pas de métriques reçues:', response);
       // Retourner les métriques brutes même si OpenAI n'en retourne pas
       return res.json({
@@ -593,13 +638,13 @@ Retourne UNIQUEMENT le JSON, sans autre texte.`;
     }
 
     res.json({
-      metrics: response.metrics || [],
+      metrics: aiResponse.metrics || [],
       comparatives: {
         weekly: weeklyComparison,
         monthly: monthlyComparison,
         yearly: yearlyComparison
       },
-      summary: response.summary || {
+      summary: aiResponse.summary || {
         totalSalesAnalyzed: sales.length,
         topCategory: topProductName,
         keyRecommendation: "Continuez à enregistrer vos ventes pour plus d'insights"
@@ -630,6 +675,8 @@ export const getRevenueForecast: RequestHandler = async (req, res) => {
   try {
     const sales = req.body.sales || []; // Ventes historiques envoyées par le client
     const barProfile = req.body.barProfile || {}; // Profil du bar
+    const requestedLanguage = normalizeLanguage((req.body?.language as string) ?? undefined);
+    const languageInstruction = getLanguageInstruction(requestedLanguage);
     
     if (!sales || sales.length === 0) {
       return res.status(400).json({
@@ -663,7 +710,9 @@ export const getRevenueForecast: RequestHandler = async (req, res) => {
     
     const avgDailyRevenue = totalRevenue / Math.max(1, sales.length);
 
-    const prompt = `Tu es analyste financier expert pour l'industrie de l'hospitalité. Analyse ces ventes historiques et génère des prévisions de revenus.
+    const prompt = `${languageInstruction}
+
+Tu es analyste financier expert pour l'industrie de l'hospitalité. Analyse ces ventes historiques et génère des prévisions de revenus.
 ${barContext}
 
 DONNÉES HISTORIQUES :
@@ -721,13 +770,23 @@ Retourne UNIQUEMENT le JSON, sans autre texte.`;
         message: 'La clé API OpenAI n\'est pas configurée. Vérifiez OPENAI_API_KEY dans .env'
       });
     }
+
+    // Type assertion to avoid TS error on unknown
+    const aiResponse = response as {
+      annualForecast?: number;
+      averageMonthlyRevenue?: number;
+      trend?: number;
+      quarterlyForecast?: any[];
+      insight?: string;
+      [key: string]: any;
+    };
     
     res.json({
-      annualForecast: Number(response.annualForecast) || 0,
-      averageMonthlyRevenue: Number(response.averageMonthlyRevenue) || 0,
-      trend: Number(response.trend) || 0,
-      quarterlyForecast: response.quarterlyForecast || [],
-      insight: response.insight || "Prévisions basées sur l'historique des ventes",
+      annualForecast: Number(aiResponse.annualForecast) || 0,
+      averageMonthlyRevenue: Number(aiResponse.averageMonthlyRevenue) || 0,
+      trend: Number(aiResponse.trend) || 0,
+      quarterlyForecast: aiResponse.quarterlyForecast || [],
+      insight: aiResponse.insight || "Prévisions basées sur l'historique des ventes",
       basedOnSales: sales.length
     });
   } catch (error) {

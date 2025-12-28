@@ -26,7 +26,7 @@ type AITool =
   | "sales-report";
 
 export default function Analytics() {
-  const { t } = usei18n();
+  const { t, language } = usei18n();
   const [selectedTool, setSelectedTool] = useState<AITool>("insights");
   const [salesPrediction, setSalesPrediction] = useState<{
     topSellers: Array<{
@@ -239,7 +239,8 @@ export default function Analytics() {
         body: JSON.stringify({
           inventory,
           barProfile,
-          region
+          region,
+          language,
         })
       });
       console.log("[Analytics] Réponse reçue:", res.status, res.ok);
@@ -315,7 +316,8 @@ export default function Analytics() {
         body: JSON.stringify({
           sales,
           inventory,
-          barProfile: {} // TODO: récupérer le profil du bar depuis Firestore
+          barProfile: {}, // TODO: récupérer le profil du bar depuis Firestore
+          language,
         })
       });
       console.log("[Analytics] Réponse reçue:", res.status, res.ok);
@@ -387,7 +389,8 @@ export default function Analytics() {
         headers: getHeaders(),
         body: JSON.stringify({
           wines,
-          barProfile
+          barProfile,
+          language,
         })
       });
       console.log("[Analytics] Réponse reçue:", res.status, res.ok);
@@ -742,37 +745,27 @@ export default function Analytics() {
     "sales-report": fetchSalesReport,
   };
 
-  const aiToolOptions: Array<{
-    id: AITool;
-    title: string;
-    description: string;
-    icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  }> = [
-    {
-      id: "insights",
-      title: "Insights intelligents",
-      description: "Analyse des ventes récentes pour dégager des tendances clés.",
-      icon: Lightbulb,
-    },
-    {
-      id: "sales-prediction",
-      title: "Prévision des ventes",
-      description: "Estimez les meilleurs vendeurs et anticipez les stocks.",
-      icon: TrendingUp,
-    },
-    {
-      id: "food-wine-pairing",
-      title: "Accords mets-vins",
-      description: "Obtention d'idées d'accords entre vos vins et vos plats.",
-      icon: UtensilsCrossed,
-    },
-    {
-      id: "sales-report",
-      title: "Rapport de ventes",
-      description: "Obtenez un rapport détaillé avec statistiques et taxes.",
-      icon: BarChart3,
-    },
+  const aiToolIconMap: Record<AITool, React.ComponentType<React.SVGProps<SVGSVGElement>>> = {
+    insights: Lightbulb,
+    "sales-prediction": TrendingUp,
+    "food-wine-pairing": UtensilsCrossed,
+    "sales-report": BarChart3,
+  };
+  const aiToolOrder: AITool[] = [
+    "insights",
+    "sales-prediction",
+    "food-wine-pairing",
+    "sales-report",
   ];
+  const aiToolOptions = aiToolOrder.map((toolId) => ({
+    id: toolId,
+    title: t.analytics.aiTools.toolOptions[toolId].title,
+    description: t.analytics.aiTools.toolOptions[toolId].description,
+    icon: aiToolIconMap[toolId],
+  }));
+
+  const getTrendLabel = (trend: "positive" | "negative" | "warning" | "neutral") =>
+    t.analytics.aiTools.insights.trendLabels[trend] ?? trend;
 
   // Vérifier que toutes les fonctions sont définies
   console.log("[Analytics] Fonctions disponibles:", Object.keys(fetchFunctions));
@@ -824,15 +817,6 @@ export default function Analytics() {
     </Card>
   );
 
-  const getTrendLabel = (trend: string): string => {
-    if (trend === "positive") return "↑ Positif";
-    if (trend === "negative") return "↓ Négatif";
-    if (trend === "warning") return "⚠ Attention";
-    if (trend === "neutral") return "→ Neutre";
-    return trend;
-  };
-
-
   const formatCityLabel = (value?: string): string => {
     if (!value) return "";
     const segments = value
@@ -872,7 +856,9 @@ export default function Analytics() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Brain className="h-7 w-7 text-primary" />
-                <h2 className="text-2xl sm:text-2xl font-bold text-foreground">Outils IA</h2>
+                <h2 className="text-2xl sm:text-2xl font-bold text-foreground">
+                  {t.analytics.aiTools.title}
+                </h2>
               </div>
               <Button
                 variant="outline"
@@ -889,7 +875,7 @@ export default function Analytics() {
                 ) : (
                   <RefreshCw className="h-4 w-4" />
                 )}
-                <span className="sr-only">Régénérer</span>
+                <span className="sr-only">{t.analytics.aiTools.refreshLabel}</span>
               </Button>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -926,7 +912,9 @@ export default function Analytics() {
                 <Card className="border-2 border-destructive/50 bg-destructive/5">
                   <CardContent className="py-12 text-center">
                     <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-                    <p className="text-destructive font-semibold mb-2">Erreur lors de la génération</p>
+                    <p className="text-destructive font-semibold mb-2">
+                      {t.analytics.aiTools.insights.errorTitle}
+                    </p>
                     <p className="text-muted-foreground text-sm mb-4">{errors["insights"]}</p>
                     <Button 
                       onClick={() => {
@@ -939,12 +927,12 @@ export default function Analytics() {
                       {loadingTools["insights"] ? (
                         <>
                           <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
-                          Réessai en cours...
+                          {t.analytics.aiTools.insights.retrying}
                         </>
                       ) : (
                         <>
                           <RefreshCw className="h-4 w-4 mr-2" />
-                          Réessayer
+                          {t.analytics.aiTools.insights.retryButton}
                         </>
                       )}
                     </Button>
@@ -955,21 +943,24 @@ export default function Analytics() {
                   <CardContent className="py-12 text-center">
                     <Lightbulb className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
                     <p className="text-muted-foreground mb-4">
-                      Générez des insights intelligents basés sur vos données de vente.
+                      {t.analytics.aiTools.insights.intro}
                     </p>
-                    <Button onClick={() => {
-                      console.log("[Analytics] Bouton insights cliqué directement");
-                      fetchInsights();
-                    }} disabled={loadingTools["insights"]}>
+                    <Button
+                      onClick={() => {
+                        console.log("[Analytics] Bouton insights cliqué directement");
+                        fetchInsights();
+                      }}
+                      disabled={loadingTools["insights"]}
+                    >
                       {loadingTools["insights"] ? (
                         <>
                           <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
-                          Génération en cours...
+                          {t.analytics.aiTools.insights.generating}
                         </>
                       ) : (
                         <>
                           <Sparkles className="h-4 w-4 mr-2" />
-                          Générer des insights
+                          {t.analytics.aiTools.insights.generateButton}
                         </>
                       )}
                     </Button>
@@ -984,10 +975,18 @@ export default function Analytics() {
                       <table className="w-full text-sm">
                         <thead className="bg-foreground/5 border-b border-foreground/20">
                           <tr>
-                            <th className="px-4 py-3 text-left font-semibold">Métrique</th>
-                            <th className="px-4 py-3 text-left font-semibold">Valeur</th>
-                            <th className="px-4 py-3 text-left font-semibold">Tendance</th>
-                            <th className="px-4 py-3 text-left font-semibold">Description</th>
+                            <th className="px-4 py-3 text-left font-semibold">
+                              {t.analytics.aiTools.insights.tableHeaders.metric}
+                            </th>
+                            <th className="px-4 py-3 text-left font-semibold">
+                              {t.analytics.aiTools.insights.tableHeaders.value}
+                            </th>
+                            <th className="px-4 py-3 text-left font-semibold">
+                              {t.analytics.aiTools.insights.tableHeaders.trend}
+                            </th>
+                            <th className="px-4 py-3 text-left font-semibold">
+                              {t.analytics.aiTools.insights.tableHeaders.description}
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1055,23 +1054,23 @@ export default function Analytics() {
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           <Brain className="h-5 w-5 text-primary" />
-                          Résumé de l'analyse
+                          {t.analytics.aiTools.insights.summary.title}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-3">
                         {insights.summary.totalSalesAnalyzed && (
                           <p className="text-sm text-foreground">
-                            <span className="font-semibold">Ventes analysées:</span> {insights.summary.totalSalesAnalyzed}
+                            <span className="font-semibold">{t.analytics.aiTools.insights.summary.totalSalesLabel}:</span> {insights.summary.totalSalesAnalyzed}
                           </p>
                         )}
                         {insights.summary.topCategory && (
                           <p className="text-sm text-foreground">
-                            <span className="font-semibold">Produit vedette:</span> {insights.summary.topCategory}
+                            <span className="font-semibold">{t.analytics.aiTools.insights.summary.topCategoryLabel}:</span> {insights.summary.topCategory}
                           </p>
                         )}
                         {insights.summary.keyRecommendation && (
                           <p className="text-sm text-foreground leading-relaxed">
-                            <span className="font-semibold">Recommandation clé:</span> {insights.summary.keyRecommendation}
+                            <span className="font-semibold">{t.analytics.aiTools.insights.summary.recommendationLabel}:</span> {insights.summary.keyRecommendation}
                           </p>
                         )}
                       </CardContent>
@@ -1083,13 +1082,13 @@ export default function Analytics() {
                     <Card className="border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 mt-6">
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-300">
-                          📊 Comparatifs
+                          {t.analytics.aiTools.insights.comparativesTitle}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-4">
                         {insights.comparatives.weekly && (
                           <div>
-                            <p className="text-sm font-semibold text-foreground mb-2">Hebdomadaire:</p>
+                            <p className="text-sm font-semibold text-foreground mb-2">{t.analytics.aiTools.insights.comparativesTimeframes.weekly}</p>
                             <pre className="text-xs bg-foreground/5 p-2 rounded overflow-auto max-h-32 text-foreground/70">
                               {insights.comparatives.weekly}
                             </pre>
@@ -1097,7 +1096,7 @@ export default function Analytics() {
                         )}
                         {insights.comparatives.monthly && (
                           <div>
-                            <p className="text-sm font-semibold text-foreground mb-2">Mensuel:</p>
+                            <p className="text-sm font-semibold text-foreground mb-2">{t.analytics.aiTools.insights.comparativesTimeframes.monthly}</p>
                             <pre className="text-xs bg-foreground/5 p-2 rounded overflow-auto max-h-32 text-foreground/70">
                               {insights.comparatives.monthly}
                             </pre>
@@ -1105,7 +1104,7 @@ export default function Analytics() {
                         )}
                         {insights.comparatives.yearly && (
                           <div>
-                            <p className="text-sm font-semibold text-foreground mb-2">Annuel:</p>
+                            <p className="text-sm font-semibold text-foreground mb-2">{t.analytics.aiTools.insights.comparativesTimeframes.yearly}</p>
                             <pre className="text-xs bg-foreground/5 p-2 rounded overflow-auto max-h-32 text-foreground/70">
                               {insights.comparatives.yearly}
                             </pre>
@@ -1121,10 +1120,10 @@ export default function Analytics() {
                   <CardContent className="py-12 text-center">
                     <Lightbulb className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
                     <p className="text-muted-foreground mb-2">
-                      Pas encore de données d'analyse disponibles.
+                      {t.analytics.aiTools.insights.noDataTitle}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Les insights IA apparaîtront après quelques ventes.
+                      {t.analytics.aiTools.insights.noDataDescription}
                     </p>
                   </CardContent>
                 </Card>
@@ -1272,7 +1271,9 @@ export default function Analytics() {
                 <Card className="border-2 border-destructive/50 bg-destructive/5">
                   <CardContent className="py-12 text-center">
                     <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-                    <p className="text-destructive font-semibold mb-2">Erreur lors de la génération</p>
+                    <p className="text-destructive font-semibold mb-2">
+                      {t.analytics.aiTools.foodWinePairing.errorTitle}
+                    </p>
                     <p className="text-muted-foreground text-sm mb-4">{errors["food-wine-pairing"]}</p>
                     <Button 
                       onClick={() => {
@@ -1285,12 +1286,12 @@ export default function Analytics() {
                       {loadingTools["food-wine-pairing"] ? (
                         <>
                           <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
-                          Réessai en cours...
+                          {t.analytics.aiTools.foodWinePairing.retrying}
                         </>
                       ) : (
                         <>
                           <RefreshCw className="h-4 w-4 mr-2" />
-                          Réessayer
+                          {t.analytics.aiTools.foodWinePairing.retryButton}
                         </>
                       )}
                     </Button>
@@ -1299,9 +1300,9 @@ export default function Analytics() {
               ) : !foodWinePairing || !foodWinePairing.pairings || foodWinePairing.pairings.length === 0 ? (
                 <EmptyStateWithButton
                   icon={UtensilsCrossed}
-                  message="Cliquez sur le bouton pour générer des accords mets-vin."
+                  message={t.analytics.aiTools.foodWinePairing.emptyMessage}
                   toolId="food-wine-pairing"
-                  buttonLabel="Générer des accords"
+                  buttonLabel={t.analytics.aiTools.foodWinePairing.buttonLabel}
                 />
               ) : (
                 <>
@@ -1309,7 +1310,7 @@ export default function Analytics() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <UtensilsCrossed className="h-5 w-5 text-primary" />
-                        Accord mets-vin
+                        {t.analytics.aiTools.foodWinePairing.title}
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -1344,7 +1345,9 @@ export default function Analytics() {
                 <Card className="border-2 border-destructive/50 bg-destructive/5">
                   <CardContent className="py-12 text-center">
                     <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-                    <p className="text-destructive font-semibold mb-2">Erreur lors de la génération</p>
+                    <p className="text-destructive font-semibold mb-2">
+                      {t.analytics.aiTools.salesReport.errorTitle}
+                    </p>
                     <p className="text-muted-foreground text-sm mb-4">{errors["sales-report"]}</p>
                     <Button 
                       onClick={() => {
@@ -1357,12 +1360,12 @@ export default function Analytics() {
                       {loadingTools["sales-report"] ? (
                         <>
                           <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
-                          Chargement...
+                          {t.analytics.aiTools.salesReport.loading}
                         </>
                       ) : (
                         <>
                           <RefreshCw className="h-4 w-4 mr-2" />
-                          Réessayer
+                          {t.analytics.aiTools.salesReport.retryButton}
                         </>
                       )}
                     </Button>
@@ -1371,24 +1374,28 @@ export default function Analytics() {
               ) : !salesReport ? (
                 <EmptyStateWithButton
                   icon={BarChart3}
-                  message="Cliquez sur le bouton pour générer un rapport détaillé de ventes."
+                  message={t.analytics.aiTools.salesReport.emptyMessage}
                   toolId="sales-report"
-                  buttonLabel="Générer le rapport"
+                  buttonLabel={t.analytics.aiTools.salesReport.buttonLabel}
                 />
               ) : (
                 <>
                   <div className="space-y-4">
                     {/* Statistiques principales */}
                     <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                      <Card className="border-2 border-foreground/20">
+                          <Card className="border-2 border-foreground/20">
                         <CardContent className="pt-6">
-                          <div className="text-xs text-muted-foreground mb-1">Total de ventes</div>
+                          <div className="text-xs text-muted-foreground mb-1">
+                            {t.analytics.aiTools.salesReport.statsLabels.totalSales}
+                          </div>
                           <div className="text-2xl font-bold text-foreground">{salesReport.totalSales}</div>
                         </CardContent>
                       </Card>
                       <Card className="border-2 border-foreground/20">
                         <CardContent className="pt-6">
-                          <div className="text-xs text-muted-foreground mb-1">Revenu total</div>
+                          <div className="text-xs text-muted-foreground mb-1">
+                            {t.analytics.aiTools.salesReport.statsLabels.revenue}
+                          </div>
                           <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                             ${salesReport.totalRevenue?.toFixed(2) || "0.00"}
                           </div>
@@ -1396,25 +1403,33 @@ export default function Analytics() {
                       </Card>
                       <Card className="border-2 border-foreground/20">
                         <CardContent className="pt-6">
-                          <div className="text-xs text-muted-foreground mb-1">TPS</div>
+                          <div className="text-xs text-muted-foreground mb-1">
+                            {t.analytics.aiTools.salesReport.statsLabels.tps}
+                          </div>
                           <div className="text-2xl font-bold text-foreground">${salesReport.totalTPS?.toFixed(2) || "0.00"}</div>
                         </CardContent>
                       </Card>
                       <Card className="border-2 border-foreground/20">
                         <CardContent className="pt-6">
-                          <div className="text-xs text-muted-foreground mb-1">TVQ</div>
+                          <div className="text-xs text-muted-foreground mb-1">
+                            {t.analytics.aiTools.salesReport.statsLabels.tvq}
+                          </div>
                           <div className="text-2xl font-bold text-foreground">${salesReport.totalTVQ?.toFixed(2) || "0.00"}</div>
                         </CardContent>
                       </Card>
                       <Card className="border-2 border-foreground/20">
                         <CardContent className="pt-6">
-                          <div className="text-xs text-muted-foreground mb-1">Pourboires</div>
+                          <div className="text-xs text-muted-foreground mb-1">
+                            {t.analytics.aiTools.salesReport.statsLabels.tips}
+                          </div>
                           <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">${salesReport.totalTips?.toFixed(2) || "0.00"}</div>
                         </CardContent>
                       </Card>
                       <Card className="border-2 border-foreground/20">
                         <CardContent className="pt-6">
-                          <div className="text-xs text-muted-foreground mb-1">Valeur moyenne</div>
+                          <div className="text-xs text-muted-foreground mb-1">
+                            {t.analytics.aiTools.salesReport.statsLabels.averageValue}
+                          </div>
                           <div className="text-2xl font-bold text-foreground">${salesReport.averageSaleValue?.toFixed(2) || "0.00"}</div>
                         </CardContent>
                       </Card>

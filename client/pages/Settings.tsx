@@ -238,7 +238,7 @@ export default function Settings() {
   const getRoleLabel = (role: UserRole | null) => {
     if (!role) return null;
     const labels = ROLE_LABELS[role];
-    const allowedLanguages = ["fr", "en", "es", "de"] as const;
+    const allowedLanguages = ["fr", "en"] as const;
     const langKey = allowedLanguages.includes(language as (typeof allowedLanguages)[number])
       ? (language as (typeof allowedLanguages)[number])
       : "en";
@@ -487,7 +487,7 @@ export default function Settings() {
   };
 
   const handleLanguageChange = (newLanguage: string) => {
-    setLanguage(newLanguage as "en" | "fr" | "es" | "de");
+    setLanguage(newLanguage as "en" | "fr");
   };
 
   const handleSave = async () => {
@@ -1537,8 +1537,6 @@ export default function Settings() {
                   <SelectContent>
                     <SelectItem value="en">English</SelectItem>
                     <SelectItem value="fr">Français</SelectItem>
-                    <SelectItem value="es">Español</SelectItem>
-                    <SelectItem value="de">Deutsch</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -2112,12 +2110,7 @@ export default function Settings() {
                           id="deleteConfirm"
                           value={deleteConfirmation}
                           onChange={(e) => setDeleteConfirmation(e.target.value)}
-                          placeholder={
-                            language === "fr" ? "SUPPRIMER" :
-                            language === "es" ? "ELIMINAR" :
-                            language === "de" ? "LÖSCHEN" :
-                            "DELETE"
-                          }
+                          placeholder={language === "fr" ? "SUPPRIMER" : "DELETE"}
                           className="font-mono"
                         />
                       </div>
@@ -2141,10 +2134,7 @@ export default function Settings() {
                           disabled={
                             isDeletingAccount || 
                             deleteConfirmation !== (
-                              language === "fr" ? "SUPPRIMER" :
-                              language === "es" ? "ELIMINAR" :
-                              language === "de" ? "LÖSCHEN" :
-                              "DELETE"
+                              language === "fr" ? "SUPPRIMER" : "DELETE"
                             )
                           }
                         >

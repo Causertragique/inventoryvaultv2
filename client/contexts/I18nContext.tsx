@@ -9,27 +9,31 @@ interface i18nContextType {
 
 const i18nContext = createContext<i18nContextType | undefined>(undefined);
 
+const supportedClientLanguages = ["en", "fr"] as const;
+type ClientLanguage = (typeof supportedClientLanguages)[number];
+
+const isSupportedClientLanguage = (lang: string | null | undefined): lang is ClientLanguage => {
+  if (!lang) return false;
+  return supportedClientLanguages.includes(lang as ClientLanguage);
+};
+
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
-    // Load from localStorage first
-    const saved = localStorage.getItem("language") as Language | null;
-    if (saved && ["en", "fr", "es", "de"].includes(saved)) {
-      return saved;
+    const saved = localStorage.getItem("language");
+    if (isSupportedClientLanguage(saved)) {
+      return saved as Language;
     }
-    
-    // Detect browser language
+
     const browserLang = navigator.language.toLowerCase();
     if (browserLang.startsWith("fr")) return "fr";
-    if (browserLang.startsWith("es")) return "es";
-    if (browserLang.startsWith("de")) return "de";
-    
-    // Default to English
+
     return "en";
   });
 
   const setLanguage = (lang: Language) => {
-    setLanguageState(lang);
-    localStorage.setItem("language", lang);
+    const nextLanguage = isSupportedClientLanguage(lang) ? lang : "en";
+    setLanguageState(nextLanguage);
+    localStorage.setItem("language", nextLanguage);
   };
 
   const t = getTranslations(language);

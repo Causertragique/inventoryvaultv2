@@ -167,6 +167,7 @@ export interface Translations {
       hideDetails: string;
       allTabsTotal: string;
       completeSale: string;
+      outOfStockLabel: string;
       categories: {
         all: string;
         spirits: string;
@@ -177,11 +178,69 @@ export interface Translations {
         other: string;
         cocktail: string;
       };
-    alerts: {
-      cashPayment: string;
-      orderCompleted: string;
+      sellProductCTA: string;
+      sellProductDialogTitle: string;
+      sellProductDialogDescription: string;
+      sellProductForm: {
+        typeStepTitle: string;
+        typeStepDescription: string;
+        containerStepTitle: string;
+        containerStepDescription: string;
+        productStepTitle: string;
+        productStepDescription: string;
+        containerAutoMessage: string;
+        inventoryGroups: {
+          compatible: string;
+          other: string;
+        };
+        selectProductPlaceholder: string;
+        noProductsAvailable: string;
+        presetRecipeLabel: string;
+        presetSelectPlaceholder: string;
+        customCocktailLabel: string;
+        customCocktailPlaceholder: string;
+        ingredientReferenceLabel: string;
+        ingredientCustomLabel: string;
+        customIngredientProductLabel: string;
+        customIngredientQuantityLabel: string;
+        customIngredientRemoveLabel: string;
+        addIngredientButton: string;
+        estimatedCostLabel: string;
+        estimatedCostDetailSingle: string;
+        estimatedCostDetailMulti: string;
+        profitMarginLabel: string;
+        profitMarginHint: string;
+        salePriceLabel: string;
+        containerSelectedLabel: string;
+        stepIndicator: string;
+        stockCount: string;
+        saveButton: string;
+        typeOptions: Record<string, { label: string; helper: string }>;
+        containerOptions: Record<string, string>;
+        errors: {
+          typeRequired: string;
+          containerRequired: string;
+          priceInvalid: string;
+          productRequired: string;
+          ingredientRequired: string;
+        };
+        customCocktailFallback: string;
+        saleDisplayNameFallback: string;
+      };
+      cocktailRecipeLabel: string;
+      cocktailRecipeSelectPlaceholder: string;
+      alerts: {
+        cashPayment: string;
+        orderCompleted: string;
+      };
+      servingConfig: {
+        title: string;
+        description: string;
+        formatDetails: string;
+        categoryLabels: Record<string, string>;
+        formats: Record<string, Record<string, string>>;
+      };
     };
-  };
 
   // Analytics page
   analytics: {
@@ -217,6 +276,85 @@ export interface Translations {
       dailyTipsLabel: string;
       dailyTaxLabel: string;
       downloadCsvButton: string;
+    };
+    aiTools: {
+      title: string;
+      refreshLabel: string;
+      toolOptions: {
+        insights: {
+          title: string;
+          description: string;
+        };
+        "sales-prediction": {
+          title: string;
+          description: string;
+        };
+        "food-wine-pairing": {
+          title: string;
+          description: string;
+        };
+        "sales-report": {
+          title: string;
+          description: string;
+        };
+      };
+      insights: {
+        errorTitle: string;
+        retrying: string;
+        retryButton: string;
+        intro: string;
+        generateButton: string;
+        generating: string;
+        noDataTitle: string;
+        noDataDescription: string;
+        comparativesTitle: string;
+        comparativesTimeframes: {
+          weekly: string;
+          monthly: string;
+          yearly: string;
+        };
+        trendLabels: {
+          positive: string;
+          negative: string;
+          warning: string;
+          neutral: string;
+        };
+        tableHeaders: {
+          metric: string;
+          value: string;
+          trend: string;
+          description: string;
+        };
+        summary: {
+          title: string;
+          totalSalesLabel: string;
+          topCategoryLabel: string;
+          recommendationLabel: string;
+        };
+      };
+      foodWinePairing: {
+        errorTitle: string;
+        retrying: string;
+        retryButton: string;
+        emptyMessage: string;
+        buttonLabel: string;
+        title: string;
+      };
+      salesReport: {
+        errorTitle: string;
+        loading: string;
+        retryButton: string;
+        emptyMessage: string;
+        buttonLabel: string;
+        statsLabels: {
+          totalSales: string;
+          revenue: string;
+          tps: string;
+          tvq: string;
+          tips: string;
+          averageValue: string;
+        };
+      };
     };
   };
 
@@ -449,6 +587,8 @@ export interface Translations {
     system: string;
     cancel: string;
     close: string;
+    previous: string;
+    next: string;
     units: {
       bottles: string;
       bottle: string;
@@ -489,7 +629,7 @@ export interface Translations {
 const translations: Record<Language, Translations> = {
   en: {
     Layout: {
-      appName: "Reserve Vault",
+      appName: "Inventory Vault",
       appSubtitle: "Inventory & POS System",
       nav: {
         inventory: "Inventory",
@@ -644,6 +784,7 @@ const translations: Record<Language, Translations> = {
       hideDetails: "Hide Details",
       allTabsTotal: "Total of all tabs",
       completeSale: "Complete Sale",
+      outOfStockLabel: "Out of stock",
       categories: {
         all: "All",
         spirits: "Spirits",
@@ -654,9 +795,131 @@ const translations: Record<Language, Translations> = {
         other: "Other",
         cocktail: "Cocktails",
       },
+      sellProductCTA: "Add product",
+      sellProductDialogTitle: "Sell a product",
+      sellProductDialogDescription:
+        "Choose an inventory item or build a quick recipe to add it to the sale.",
+      sellProductForm: {
+        typeStepTitle: "Service type",
+        typeStepDescription: "Select the format you want to sell (glass, flight, etc.).",
+        containerStepTitle: "Container",
+        containerStepDescription: "Pick the container or variant that matches this service.",
+        productStepTitle: "Product",
+        productStepDescription: "Choose an inventory product to attach to this recipe.",
+        containerAutoMessage: "We'll pick the best container automatically.",
+        inventoryGroups: {
+          compatible: "Compatible inventory",
+          other: "Other inventory",
+        },
+        selectProductPlaceholder: "Choose a product",
+        noProductsAvailable: "No products available for this selection.",
+        presetRecipeLabel: "Default recipe",
+        presetSelectPlaceholder: "Select a recipe...",
+        customCocktailLabel: "House cocktail name",
+        customCocktailPlaceholder: "Cocktail name",
+        ingredientReferenceLabel: "Recipe",
+        ingredientCustomLabel: "Custom ingredient",
+        customIngredientProductLabel: "Product",
+        customIngredientQuantityLabel: "Quantity (ml)",
+        customIngredientRemoveLabel: "Remove ingredient",
+        addIngredientButton: "Add ingredient",
+        estimatedCostLabel: "Estimated cost of service",
+        estimatedCostDetailSingle:
+          "Based on {servingVolume} ml of the {bottleSize} ml bottle.",
+        estimatedCostDetailMulti: "Based on {totalVolume} ml of ingredients.",
+        profitMarginLabel: "Profit margin (%)",
+        profitMarginHint: "Suggested price: {price}",
+        salePriceLabel: "Sale price",
+        containerSelectedLabel: "Selected container: {container}",
+        stepIndicator: "Step {current} / {total}",
+        stockCount: "{count} in stock",
+        saveButton: "Save product",
+        typeOptions: {
+          wine: {
+            label: "Wine",
+            helper: "Glass, half-liter or bottle",
+          },
+          beer: {
+            label: "Beer",
+            helper: "Glass, pint or buck",
+          },
+          shot: {
+            label: "Shot",
+            helper: "1.5 oz standard pour",
+          },
+          cocktail: {
+            label: "Cocktail",
+            helper: "Preset or custom recipe",
+          },
+          other: {
+            label: "Other",
+            helper: "Mocktails, juices or specials",
+          },
+        },
+        containerOptions: {
+          "wine-red-glass": "Red wine glass (180 ml)",
+          "wine-white-glass": "White wine glass (150 ml)",
+          "wine-half-liter": "Half liter (500 ml)",
+          "wine-bottle": "Bottle (750 ml)",
+          "beer-bottle": "Bottle (341 ml)",
+          "beer-glass": "Glass (355 ml)",
+          "beer-pint": "Pint (473 ml)",
+          "beer-buck": "Buck (500 ml)",
+          "cocktail-default-recipe": "Default recipe",
+          "cocktail-custom": "Custom recipe",
+        },
+        errors: {
+          typeRequired: "Choose a service type.",
+          containerRequired: "Select a container.",
+          priceInvalid: "Enter a valid price.",
+          productRequired: "Select an inventory product.",
+          ingredientRequired: "Add at least one ingredient with a valid quantity.",
+        },
+        customCocktailFallback: "House cocktail",
+        saleDisplayNameFallback: "Sale product",
+      },
+      cocktailRecipeLabel: "Cocktail recipe",
+      cocktailRecipeSelectPlaceholder: "Select a recipe...",
       alerts: {
         cashPayment: "Cash payment received! Total: $",
         orderCompleted: "Order completed! Total: $",
+      },
+      servingConfig: {
+        title: "Serving formats & margins",
+        description:
+          "Adjust the margin applied to each serving format (price = cost × (1 + margin/100)).",
+        formatDetails: "{volume} ml • default margin {margin}%",
+        categoryLabels: {
+          spirits: "Spirits",
+          wine: "Wine",
+          beer: "Beer",
+          soda: "Ready-to-drink",
+          juice: "Juice",
+          other: "Other",
+        },
+        formats: {
+          spirits: {
+            shot: "Shooter 1.5 oz",
+            double: "Double 3 oz",
+          },
+          wine: {
+            "wine-white-glass": "White wine glass (150 ml)",
+            "wine-red-glass": "Red wine glass (180 ml)",
+          },
+          beer: {
+            "beer-pint": "Pint (473 ml)",
+            "beer-buck": "Buck (355 ml)",
+          },
+          soda: {
+            rtb: "Ready-to-drink 250 ml",
+          },
+          juice: {
+            "juice-glass": "Glass 250 ml",
+          },
+          other: {
+            "other-portion": "Portion 200 ml",
+          },
+        },
       },
       accessDenied: "",
       noSalesPermission: ""
@@ -694,6 +957,85 @@ const translations: Record<Language, Translations> = {
         dailyTipsLabel: "Tips",
         dailyTaxLabel: "Taxes",
         downloadCsvButton: "Download full report (CSV)",
+      },
+      aiTools: {
+        title: "AI Tools",
+        refreshLabel: "Refresh AI results",
+        toolOptions: {
+          insights: {
+            title: "Smart insights",
+            description: "Analyze recent sales to surface key trends.",
+          },
+          "sales-prediction": {
+            title: "Sales prediction",
+            description: "Forecast your best sellers and expected demand.",
+          },
+          "food-wine-pairing": {
+            title: "Food & wine pairing",
+            description: "Generate pairing suggestions for your menu.",
+          },
+          "sales-report": {
+            title: "Sales report",
+            description: "Get a detailed breakdown with stats and tax totals.",
+          },
+        },
+        insights: {
+          errorTitle: "Error generating insights",
+          retrying: "Retrying...",
+          retryButton: "Retry",
+          intro: "Generate smart insights based on your sales data.",
+          generateButton: "Generate insights",
+          generating: "Generating...",
+          noDataTitle: "Insights coming soon",
+          noDataDescription: "AI insights will appear after a few sales have been recorded.",
+          comparativesTitle: "Compare performance",
+          comparativesTimeframes: {
+            weekly: "Weekly",
+            monthly: "Monthly",
+            yearly: "Yearly",
+          },
+        trendLabels: {
+          positive: "Positive",
+          negative: "Negative",
+          warning: "Watch",
+          neutral: "Neutral",
+        },
+        tableHeaders: {
+          metric: "Metric",
+          value: "Value",
+          trend: "Trend",
+          description: "Description",
+        },
+        summary: {
+          title: "Analysis summary",
+          totalSalesLabel: "Sales analyzed",
+          topCategoryLabel: "Featured product",
+          recommendationLabel: "Key recommendation",
+        },
+      },
+        foodWinePairing: {
+          errorTitle: "Error generating pairings",
+          retrying: "Retrying...",
+          retryButton: "Retry",
+          emptyMessage: "Click the button to generate food and wine pairings.",
+          buttonLabel: "Generate pairings",
+          title: "Food & wine pairing",
+        },
+        salesReport: {
+          errorTitle: "Error generating report",
+          loading: "Loading report...",
+          retryButton: "Retry",
+          emptyMessage: "Click the button to generate a detailed sales report.",
+          buttonLabel: "Generate report",
+          statsLabels: {
+            totalSales: "Total sales",
+            revenue: "Revenue",
+            tps: "TPS",
+            tvq: "TVQ",
+            tips: "Tips",
+            averageValue: "Avg. value",
+          },
+        },
       },
     },
     auditLogs: {
@@ -914,6 +1256,8 @@ const translations: Record<Language, Translations> = {
       system: "System",
       cancel: "Cancel",
       close: "Close",
+      previous: "Previous",
+      next: "Next",
       units: {
         bottles: "bottles",
         bottle: "bottle",
@@ -926,7 +1270,7 @@ const translations: Record<Language, Translations> = {
       },
     },
     home: {
-      title: "Reserve Vault",
+      title: "Inventory Vault",
       subtitle: "Manage your bar with style",
       username: "Username",
       usernamePlaceholder: "Enter your username",
@@ -1105,6 +1449,7 @@ const translations: Record<Language, Translations> = {
       hideDetails: "Masquer les détails",
       allTabsTotal: "Total de tous les comptes",
       completeSale: "Finaliser la vente",
+      outOfStockLabel: "Rupture de stock",
       categories: {
         all: "Tous",
         spirits: "Spiritueux",
@@ -1115,9 +1460,131 @@ const translations: Record<Language, Translations> = {
         other: "Autres",
         cocktail: "Cocktails",
       },
+      sellProductCTA: "Ajouter un produit",
+      sellProductDialogTitle: "Vendre un produit",
+      sellProductDialogDescription:
+        "Choisissez un article de l'inventaire ou créez une recette rapide pour l'ajouter à la vente.",
+      sellProductForm: {
+        typeStepTitle: "Type de service",
+        typeStepDescription: "Sélectionnez le format à servir (verre, volée, etc.).",
+        containerStepTitle: "Contenant",
+        containerStepDescription: "Choisissez le contenant ou la variante adaptée à ce service.",
+        productStepTitle: "Produit",
+        productStepDescription: "Choisissez un produit d'inventaire pour l'associer à cette recette.",
+        containerAutoMessage: "Nous sélectionnerons automatiquement le contenant le plus adapté.",
+        inventoryGroups: {
+          compatible: "Inventaire compatible",
+          other: "Autres produits",
+        },
+        selectProductPlaceholder: "Choisissez un produit",
+        noProductsAvailable: "Aucun produit disponible pour cette sélection.",
+        presetRecipeLabel: "Recette par défaut",
+        presetSelectPlaceholder: "Sélectionnez une recette...",
+        customCocktailLabel: "Nom du cocktail maison",
+        customCocktailPlaceholder: "Nom du cocktail",
+        ingredientReferenceLabel: "Recette",
+        ingredientCustomLabel: "Ingrédient personnalisé",
+        customIngredientProductLabel: "Produit",
+        customIngredientQuantityLabel: "Quantité (ml)",
+        customIngredientRemoveLabel: "Supprimer l'ingrédient",
+        addIngredientButton: "Ajouter un ingrédient",
+        estimatedCostLabel: "Coût estimé du service",
+        estimatedCostDetailSingle:
+          "Basé sur {servingVolume} ml de la bouteille de {bottleSize} ml.",
+        estimatedCostDetailMulti: "Basé sur {totalVolume} ml d'ingrédients.",
+        profitMarginLabel: "Marge de profit (%)",
+        profitMarginHint: "Prix suggéré : {price}",
+        salePriceLabel: "Prix de vente",
+        containerSelectedLabel: "Contenant choisi : {container}",
+        stepIndicator: "Étape {current} / {total}",
+        stockCount: "{count} en stock",
+        saveButton: "Enregistrer le produit",
+        typeOptions: {
+          wine: {
+            label: "Vin",
+            helper: "Verre, demi-litre ou bouteille",
+          },
+          beer: {
+            label: "Bière",
+            helper: "Verre, pinte ou buck",
+          },
+          shot: {
+            label: "Shot",
+            helper: "Dose standard de 1,5 oz",
+          },
+          cocktail: {
+            label: "Cocktail",
+            helper: "Recette prédéfinie ou personnalisée",
+          },
+          other: {
+            label: "Autre",
+            helper: "Mocktails, jus ou créations spéciales",
+          },
+        },
+        containerOptions: {
+          "wine-red-glass": "Verre vin rouge (180 ml)",
+          "wine-white-glass": "Verre vin blanc (150 ml)",
+          "wine-half-liter": "Demi-litre (500 ml)",
+          "wine-bottle": "Bouteille (750 ml)",
+          "beer-bottle": "Bouteille (341 ml)",
+          "beer-glass": "Verre (355 ml)",
+          "beer-pint": "Pinte (473 ml)",
+          "beer-buck": "Buck (500 ml)",
+          "cocktail-default-recipe": "Recette par défaut",
+          "cocktail-custom": "Recette maison",
+        },
+        errors: {
+          typeRequired: "Choisissez un type de service.",
+          containerRequired: "Sélectionnez un contenant.",
+          priceInvalid: "Entrez un prix valide.",
+          productRequired: "Sélectionnez un produit de l'inventaire.",
+          ingredientRequired: "Ajoutez au moins un ingrédient avec une quantité valide.",
+        },
+        customCocktailFallback: "Cocktail maison",
+        saleDisplayNameFallback: "Produit de vente",
+      },
+      cocktailRecipeLabel: "Recette de cocktail",
+      cocktailRecipeSelectPlaceholder: "Sélectionnez une recette...",
       alerts: {
         cashPayment: "Paiement en espèces reçu ! Total : ",
         orderCompleted: "Commande terminée ! Total : ",
+      },
+      servingConfig: {
+        title: "Formats de service et marges",
+        description:
+          "Ajustez la marge appliquée à chaque format de service (prix = coût × (1 + marge/100)).",
+        formatDetails: "{volume} ml • marge par défaut {margin}%",
+        categoryLabels: {
+          spirits: "Spiritueux",
+          wine: "Vin",
+          beer: "Bière",
+          soda: "Prêt-à-boire",
+          juice: "Jus",
+          other: "Autres",
+        },
+        formats: {
+          spirits: {
+            shot: "Shooter 1,5 oz",
+            double: "Double 3 oz",
+          },
+          wine: {
+            "wine-white-glass": "Verre vin blanc (150 ml)",
+            "wine-red-glass": "Verre vin rouge (180 ml)",
+          },
+          beer: {
+            "beer-pint": "Pinte (473 ml)",
+            "beer-buck": "Buck (355 ml)",
+          },
+          soda: {
+            rtb: "Prêt-à-boire 250 ml",
+          },
+          juice: {
+            "juice-glass": "Verre 250 ml",
+          },
+          other: {
+            "other-portion": "Portion 200 ml",
+          },
+        },
       },
       accessDenied: "",
       noSalesPermission: ""
@@ -1155,6 +1622,85 @@ const translations: Record<Language, Translations> = {
         dailyTipsLabel: "Pourboires",
         dailyTaxLabel: "Taxes",
         downloadCsvButton: "Télécharger le rapport complet (CSV)",
+      },
+      aiTools: {
+        title: "Outils d'IA",
+        refreshLabel: "Actualiser les résultats IA",
+        toolOptions: {
+          insights: {
+            title: "Analyses intelligentes",
+            description: "Analysez les ventes récentes pour mettre en avant les tendances clés.",
+          },
+          "sales-prediction": {
+            title: "Prédiction des ventes",
+            description: "Anticipez vos meilleurs vendeurs et la demande attendue.",
+          },
+          "food-wine-pairing": {
+            title: "Accords mets et vins",
+            description: "Générez des suggestions d'accords pour votre menu.",
+          },
+          "sales-report": {
+            title: "Rapport de ventes",
+            description: "Obtenez une ventilation détaillée avec statistiques et taxes.",
+          },
+        },
+        insights: {
+          errorTitle: "Erreur lors de la génération des analyses",
+          retrying: "Nouvel essai...",
+          retryButton: "Réessayer",
+          intro: "Générez des analyses intelligentes basées sur vos données de ventes.",
+          generateButton: "Générer les analyses",
+          generating: "Génération en cours...",
+          noDataTitle: "Analyses à venir",
+          noDataDescription: "Les analyses IA apparaîtront après quelques ventes.",
+          comparativesTitle: "Comparer les performances",
+          comparativesTimeframes: {
+            weekly: "Hebdomadaire",
+            monthly: "Mensuel",
+            yearly: "Annuel",
+          },
+          trendLabels: {
+            positive: "Positif",
+            negative: "Négatif",
+            warning: "Surveiller",
+            neutral: "Neutre",
+          },
+          tableHeaders: {
+            metric: "Métrique",
+            value: "Valeur",
+            trend: "Tendance",
+            description: "Description",
+          },
+          summary: {
+            title: "Résumé de l'analyse",
+            totalSalesLabel: "Ventes analysées",
+            topCategoryLabel: "Produit vedette",
+            recommendationLabel: "Recommandation clé",
+          },
+        },
+        foodWinePairing: {
+          errorTitle: "Erreur lors de la génération des accords",
+          retrying: "Nouvel essai...",
+          retryButton: "Réessayer",
+          emptyMessage: "Cliquez sur le bouton pour générer des accords mets et vins.",
+          buttonLabel: "Générer les accords",
+          title: "Accords mets et vins",
+        },
+        salesReport: {
+          errorTitle: "Erreur lors de la génération du rapport",
+          loading: "Chargement du rapport...",
+          retryButton: "Réessayer",
+          emptyMessage: "Cliquez sur le bouton pour générer un rapport de ventes détaillé.",
+          buttonLabel: "Générer le rapport",
+          statsLabels: {
+            totalSales: "Ventes totales",
+            revenue: "Revenu",
+            tps: "TPS",
+            tvq: "TVQ",
+            tips: "Pourboires",
+            averageValue: "Valeur moyenne",
+          },
+        },
       },
     },
     auditLogs: {
@@ -1375,6 +1921,8 @@ const translations: Record<Language, Translations> = {
       system: "Système",
       cancel: "Annuler",
       close: "Fermer",
+      previous: "Précédent",
+      next: "Suivant",
       units: {
         bottles: "bouteilles",
         bottle: "bouteille",
@@ -1566,6 +2114,7 @@ const translations: Record<Language, Translations> = {
       hideDetails: "Ocultar detalles",
       allTabsTotal: "Total de todas las cuentas",
       completeSale: "Completar venta",
+      outOfStockLabel: "Agotado",
       categories: {
         all: "Todos",
         spirits: "Licores",
@@ -1576,9 +2125,132 @@ const translations: Record<Language, Translations> = {
         other: "Otros",
         cocktail: "Cócteles",
       },
+      sellProductCTA: "Agregar un producto",
+      sellProductDialogTitle: "Vender un producto",
+      sellProductDialogDescription:
+        "Elige un artículo del inventario o crea una receta rápida para agregarla a la venta.",
+      sellProductForm: {
+        typeStepTitle: "Tipo de servicio",
+        typeStepDescription: "Selecciona el formato que deseas servir (copa, trago, etc.).",
+        containerStepTitle: "Contenedor",
+        containerStepDescription: "Elige el contenedor o la variante que se adapte a este servicio.",
+        productStepTitle: "Producto",
+        productStepDescription: "Escoge un producto del inventario para asociarlo a esta receta.",
+        containerAutoMessage: "Seleccionaremos automáticamente el contenedor más adecuado.",
+        inventoryGroups: {
+          compatible: "Inventario compatible",
+          other: "Otro inventario",
+        },
+        selectProductPlaceholder: "Elige un producto",
+        noProductsAvailable: "No hay productos disponibles para esta selección.",
+        presetRecipeLabel: "Receta predeterminada",
+        presetSelectPlaceholder: "Selecciona una receta...",
+        customCocktailLabel: "Nombre del cóctel personalizado",
+        customCocktailPlaceholder: "Nombre del cóctel",
+        ingredientReferenceLabel: "Receta",
+        ingredientCustomLabel: "Ingrediente personalizado",
+        customIngredientProductLabel: "Producto",
+        customIngredientQuantityLabel: "Cantidad (ml)",
+        customIngredientRemoveLabel: "Eliminar ingrediente",
+        addIngredientButton: "Agregar un ingrediente",
+        estimatedCostLabel: "Costo estimado del servicio",
+        estimatedCostDetailSingle:
+          "Basado en {servingVolume} ml de la botella de {bottleSize} ml.",
+        estimatedCostDetailMulti: "Basado en {totalVolume} ml de ingredientes.",
+        profitMarginLabel: "Margen de ganancia (%)",
+        profitMarginHint: "Precio sugerido: {price}",
+        salePriceLabel: "Precio de venta",
+        containerSelectedLabel: "Contenedor seleccionado: {container}",
+        stepIndicator: "Paso {current} de {total}",
+        stockCount: "{count} en stock",
+        saveButton: "Guardar producto",
+        typeOptions: {
+          wine: {
+            label: "Vino",
+            helper: "Copa, medio litro o botella",
+          },
+          beer: {
+            label: "Cerveza",
+            helper: "Copa, pinta o jarra",
+          },
+          shot: {
+            label: "Trago",
+            helper: "Medida estándar de 45 ml",
+          },
+          cocktail: {
+            label: "Cóctel",
+            helper: "Receta predeterminada o personalizada",
+          },
+          other: {
+            label: "Otro",
+            helper: "Mocktails, jugos o especiales",
+          },
+        },
+        containerOptions: {
+          "wine-red-glass": "Copa de vino tinto (180 ml)",
+          "wine-white-glass": "Copa de vino blanco (150 ml)",
+          "wine-half-liter": "Medio litro (500 ml)",
+          "wine-bottle": "Botella (750 ml)",
+          "beer-bottle": "Botella (341 ml)",
+          "beer-glass": "Copa (355 ml)",
+          "beer-pint": "Pinta (473 ml)",
+          "beer-buck": "Jarra (500 ml)",
+          "cocktail-default-recipe": "Receta predeterminada",
+          "cocktail-custom": "Receta personalizada",
+        },
+        errors: {
+          typeRequired: "Elige un tipo de servicio.",
+          containerRequired: "Selecciona un contenedor.",
+          priceInvalid: "Ingresa un precio válido.",
+          productRequired: "Selecciona un producto del inventario.",
+          ingredientRequired:
+            "Agrega al menos un ingrediente con una cantidad válida.",
+        },
+        customCocktailFallback: "Cóctel personalizado",
+        saleDisplayNameFallback: "Producto de venta",
+      },
+      cocktailRecipeLabel: "Receta de cóctel",
+      cocktailRecipeSelectPlaceholder: "Selecciona una receta...",
       alerts: {
         cashPayment: "¡Pago en efectivo recibido! Total: $",
         orderCompleted: "¡Pedido completado! Total: $",
+      },
+      servingConfig: {
+        title: "Formatos de servicio y márgenes",
+        description:
+          "Ajusta el margen aplicado a cada formato de servicio (precio = costo × (1 + margen/100)).",
+        formatDetails: "{volume} ml • margen predeterminado {margin}%",
+        categoryLabels: {
+          spirits: "Licores",
+          wine: "Vino",
+          beer: "Cerveza",
+          soda: "Listo para beber",
+          juice: "Jugo",
+          other: "Otros",
+        },
+        formats: {
+          spirits: {
+            shot: "Copa de 1,5 oz",
+            double: "Doble 3 oz",
+          },
+          wine: {
+            "wine-white-glass": "Copa de vino blanco (150 ml)",
+            "wine-red-glass": "Copa de vino tinto (180 ml)",
+          },
+          beer: {
+            "beer-pint": "Pinta (473 ml)",
+            "beer-buck": "Buck (355 ml)",
+          },
+          soda: {
+            rtb: "Listo para beber 250 ml",
+          },
+          juice: {
+            "juice-glass": "Copa 250 ml",
+          },
+          other: {
+            "other-portion": "Porción 200 ml",
+          },
+        },
       },
       accessDenied: "",
       noSalesPermission: ""
@@ -1616,6 +2288,85 @@ const translations: Record<Language, Translations> = {
         dailyTipsLabel: "Propinas",
         dailyTaxLabel: "Impuestos",
         downloadCsvButton: "Descargar informe completo (CSV)",
+      },
+      aiTools: {
+        title: "Herramientas de IA",
+        refreshLabel: "Actualizar resultados de IA",
+        toolOptions: {
+          insights: {
+            title: "Perspectivas inteligentes",
+            description: "Analiza las ventas recientes para destacar las tendencias clave.",
+          },
+          "sales-prediction": {
+            title: "Predicción de ventas",
+            description: "Pronostica tus más vendidos y la demanda esperada.",
+          },
+          "food-wine-pairing": {
+            title: "Maridaje comida y vino",
+            description: "Genera sugerencias de maridaje para tu menú.",
+          },
+          "sales-report": {
+            title: "Informe de ventas",
+            description: "Obtén un desglose detallado con estadísticas e impuestos.",
+          },
+        },
+        insights: {
+          errorTitle: "Error al generar las perspectivas",
+          retrying: "Reintentando...",
+          retryButton: "Reintentar",
+          intro: "Genera perspectivas inteligentes basadas en tus datos de ventas.",
+          generateButton: "Generar perspectivas",
+          generating: "Generando...",
+          noDataTitle: "Perspectivas próximamente",
+          noDataDescription: "Las perspectivas de IA aparecerán después de registrar algunas ventas.",
+          comparativesTitle: "Comparar rendimiento",
+          comparativesTimeframes: {
+            weekly: "Semanal",
+            monthly: "Mensual",
+            yearly: "Anual",
+          },
+          trendLabels: {
+            positive: "Positivo",
+            negative: "Negativo",
+            warning: "Atención",
+            neutral: "Neutro",
+          },
+          tableHeaders: {
+            metric: "Métrica",
+            value: "Valor",
+            trend: "Tendencia",
+            description: "Descripción",
+          },
+          summary: {
+            title: "Resumen del análisis",
+            totalSalesLabel: "Ventas analizadas",
+            topCategoryLabel: "Producto destacado",
+            recommendationLabel: "Recomendación clave",
+          },
+        },
+        foodWinePairing: {
+          errorTitle: "Error al generar los maridajes",
+          retrying: "Reintentando...",
+          retryButton: "Reintentar",
+          emptyMessage: "Haz clic en el botón para generar maridajes de comida y vino.",
+          buttonLabel: "Generar maridajes",
+          title: "Maridaje comida y vino",
+        },
+        salesReport: {
+          errorTitle: "Error al generar el informe",
+          loading: "Cargando informe...",
+          retryButton: "Reintentar",
+          emptyMessage: "Haz clic en el botón para generar un informe detallado de ventas.",
+          buttonLabel: "Generar informe",
+          statsLabels: {
+            totalSales: "Ventas totales",
+            revenue: "Ingresos",
+            tps: "TPS",
+            tvq: "TVQ",
+            tips: "Propinas",
+            averageValue: "Valor promedio",
+          },
+        },
       },
     },
     auditLogs: {
@@ -1836,6 +2587,8 @@ const translations: Record<Language, Translations> = {
       system: "Sistema",
       cancel: "Cancelar",
       close: "Cerrar",
+      previous: "Anterior",
+      next: "Siguiente",
       units: {
         bottles: "botellas",
         bottle: "botella",
@@ -2027,6 +2780,7 @@ const translations: Record<Language, Translations> = {
       hideDetails: "Details ausblenden",
       allTabsTotal: "Gesamt aller Rechnungen",
       completeSale: "Verkauf abschließen",
+      outOfStockLabel: "Nicht vorrätig",
       categories: {
         all: "Alle",
         spirits: "Spirituosen",
@@ -2037,9 +2791,136 @@ const translations: Record<Language, Translations> = {
         other: "Andere",
         cocktail: "Cocktails",
       },
+      sellProductCTA: "Produkt hinzufügen",
+      sellProductDialogTitle: "Produkt verkaufen",
+      sellProductDialogDescription:
+        "Wähle einen Artikel aus dem Inventar oder erstell eine schnelle Rezeptur, um ihn zum Verkauf hinzuzufügen.",
+      sellProductForm: {
+        typeStepTitle: "Servicetyp",
+        typeStepDescription:
+          "Wählen Sie das Format, das Sie servieren möchten (Glas, Flight usw.).",
+        containerStepTitle: "Behälter",
+        containerStepDescription:
+          "Wählen Sie den Behälter oder die Variante, die zu diesem Service passt.",
+        productStepTitle: "Produkt",
+        productStepDescription:
+          "Wählen Sie ein Inventarprodukt für dieses Rezept.",
+        containerAutoMessage: "Wir wählen automatisch den passendsten Behälter aus.",
+        inventoryGroups: {
+          compatible: "Kompatibles Inventar",
+          other: "Sonstiges Inventar",
+        },
+        selectProductPlaceholder: "Produkt wählen",
+        noProductsAvailable:
+          "Für diese Auswahl sind keine Produkte verfügbar.",
+        presetRecipeLabel: "Standardrezept",
+        presetSelectPlaceholder: "Rezept auswählen...",
+        customCocktailLabel: "Name des hausgemachten Cocktails",
+        customCocktailPlaceholder: "Cocktailname",
+        ingredientReferenceLabel: "Rezept",
+        ingredientCustomLabel: "Individuelle Zutat",
+        customIngredientProductLabel: "Produkt",
+        customIngredientQuantityLabel: "Menge (ml)",
+        customIngredientRemoveLabel: "Zutat entfernen",
+        addIngredientButton: "Zutat hinzufügen",
+        estimatedCostLabel: "Geschätzte Servicenkosten",
+        estimatedCostDetailSingle:
+          "Basierend auf {servingVolume} ml der {bottleSize} ml Flasche.",
+        estimatedCostDetailMulti: "Basierend auf {totalVolume} ml Zutaten.",
+        profitMarginLabel: "Gewinnspanne (%)",
+        profitMarginHint: "Vorgeschlagener Preis: {price}",
+        salePriceLabel: "Verkaufspreis",
+        containerSelectedLabel: "Ausgewählter Behälter: {container}",
+        stepIndicator: "Schritt {current} von {total}",
+        stockCount: "{count} auf Lager",
+        saveButton: "Produkt speichern",
+        typeOptions: {
+          wine: {
+            label: "Wein",
+            helper: "Glas, halber Liter oder Flasche",
+          },
+          beer: {
+            label: "Bier",
+            helper: "Glas, Pinte oder Buck",
+          },
+          shot: {
+            label: "Shot",
+            helper: "Standardportion (45 ml)",
+          },
+          cocktail: {
+            label: "Cocktail",
+            helper: "Vorgegebenes oder eigenes Rezept",
+          },
+          other: {
+            label: "Andere",
+            helper: "Mocktails, Säfte oder Specials",
+          },
+        },
+        containerOptions: {
+          "wine-red-glass": "Rotweinglas (180 ml)",
+          "wine-white-glass": "Weißweinglas (150 ml)",
+          "wine-half-liter": "Halber Liter (500 ml)",
+          "wine-bottle": "Flasche (750 ml)",
+          "beer-bottle": "Flasche (341 ml)",
+          "beer-glass": "Glas (355 ml)",
+          "beer-pint": "Pinte (473 ml)",
+          "beer-buck": "Buck (500 ml)",
+          "cocktail-default-recipe": "Standardrezept",
+          "cocktail-custom": "Eigenes Rezept",
+        },
+        errors: {
+          typeRequired: "Wählen Sie einen Servicetyp.",
+          containerRequired: "Wählen Sie einen Behälter.",
+          priceInvalid: "Geben Sie einen gültigen Preis ein.",
+          productRequired: "Wählen Sie ein Inventarprodukt.",
+          ingredientRequired:
+            "Fügen Sie mindestens eine Zutat mit gültiger Menge hinzu.",
+        },
+        customCocktailFallback: "Hauscocktail",
+        saleDisplayNameFallback: "Verkaufsprodukt",
+      },
+      cocktailRecipeLabel: "Cocktail-Rezept",
+      cocktailRecipeSelectPlaceholder: "Rezept auswählen...",
       alerts: {
         cashPayment: "Barzahlung erhalten! Gesamt: $",
         orderCompleted: "Bestellung abgeschlossen! Gesamt: $",
+      },
+      servingConfig: {
+        title: "Verkaufsversionen & Margen",
+        description:
+          "Passen Sie die Marge für jedes Servierformat an (Preis = Kosten × (1 + Marge/100)).",
+        formatDetails: "{volume} ml • Standardmarge {margin}%",
+        categoryLabels: {
+          spirits: "Spirituosen",
+          wine: "Wein",
+          beer: "Bier",
+          soda: "Trinkfertig",
+          juice: "Saft",
+          other: "Andere",
+        },
+        formats: {
+          spirits: {
+            shot: "Shot 1,5 oz",
+            double: "Double 3 oz",
+          },
+          wine: {
+            "wine-white-glass": "Weißweinglas (150 ml)",
+            "wine-red-glass": "Rotweinglas (180 ml)",
+          },
+          beer: {
+            "beer-pint": "Pint (473 ml)",
+            "beer-buck": "Buck (355 ml)",
+          },
+          soda: {
+            rtb: "Trinkfertig 250 ml",
+          },
+          juice: {
+            "juice-glass": "Glas 250 ml",
+          },
+          other: {
+            "other-portion": "Portion 200 ml",
+          },
+        },
       },
       accessDenied: "",
       noSalesPermission: ""
@@ -2077,6 +2958,85 @@ const translations: Record<Language, Translations> = {
         dailyTipsLabel: "Trinkgelder",
         dailyTaxLabel: "Steuern",
         downloadCsvButton: "Kompletten Bericht herunterladen (CSV)",
+      },
+      aiTools: {
+        title: "KI-Tools",
+        refreshLabel: "KI-Ergebnisse aktualisieren",
+        toolOptions: {
+          insights: {
+            title: "Smarter Einblick",
+            description: "Analysieren Sie aktuelle Verkäufe, um wichtige Trends zu erkennen.",
+          },
+          "sales-prediction": {
+            title: "Verkaufsprognose",
+            description: "Prognostizieren Sie Ihre Bestseller und die erwartete Nachfrage.",
+          },
+          "food-wine-pairing": {
+            title: "Speisen- & Weinbegleitung",
+            description: "Erstellen Sie passende Vorschläge für Ihr Menü.",
+          },
+          "sales-report": {
+            title: "Verkaufsbericht",
+            description: "Erhalten Sie eine detaillierte Aufschlüsselung mit Statistiken und Steuern.",
+          },
+        },
+        insights: {
+          errorTitle: "Fehler bei der Generierung der Einblicke",
+          retrying: "Erneuter Versuch...",
+          retryButton: "Erneut versuchen",
+          intro: "Generieren Sie smarte Einblicke basierend auf Ihren Verkaufsdaten.",
+          generateButton: "Einblicke generieren",
+          generating: "Generierung läuft...",
+          noDataTitle: "Einblicke kommen bald",
+          noDataDescription: "KI-Einblicke erscheinen nach einigen erfassten Verkäufen.",
+          comparativesTitle: "Leistung vergleichen",
+          comparativesTimeframes: {
+            weekly: "Wöchentlich",
+            monthly: "Monatlich",
+            yearly: "Jährlich",
+          },
+          trendLabels: {
+            positive: "Positiv",
+            negative: "Negativ",
+            warning: "Beobachten",
+            neutral: "Neutral",
+          },
+          tableHeaders: {
+            metric: "Metrik",
+            value: "Wert",
+            trend: "Trend",
+            description: "Beschreibung",
+          },
+          summary: {
+            title: "Analyseübersicht",
+            totalSalesLabel: "Analysierte Verkäufe",
+            topCategoryLabel: "Top-Produkt",
+            recommendationLabel: "Wichtigste Empfehlung",
+          },
+        },
+        foodWinePairing: {
+          errorTitle: "Fehler bei der Generierung der Begleitungen",
+          retrying: "Erneuter Versuch...",
+          retryButton: "Erneut versuchen",
+          emptyMessage: "Klicken Sie auf die Schaltfläche, um Speise- und Weinbegleitungen zu generieren.",
+          buttonLabel: "Begleitungen generieren",
+          title: "Speisen- & Weinbegleitung",
+        },
+        salesReport: {
+          errorTitle: "Fehler bei der Berichtserstellung",
+          loading: "Bericht wird geladen...",
+          retryButton: "Erneut versuchen",
+          emptyMessage: "Klicken Sie auf die Schaltfläche, um einen detaillierten Verkaufsbericht zu erstellen.",
+          buttonLabel: "Bericht generieren",
+          statsLabels: {
+            totalSales: "Gesamtverkäufe",
+            revenue: "Umsatz",
+            tps: "TPS",
+            tvq: "TVQ",
+            tips: "Trinkgelder",
+            averageValue: "Durchschnittswert",
+          },
+        },
       },
     },
     auditLogs: {
@@ -2297,6 +3257,8 @@ const translations: Record<Language, Translations> = {
       system: "System",
       cancel: "Abbrechen",
       close: "Schließen",
+      previous: "Zurück",
+      next: "Weiter",
       units: {
         bottles: "Flaschen",
         bottle: "Flasche",
