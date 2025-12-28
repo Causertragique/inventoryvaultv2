@@ -12,19 +12,6 @@ import { Label } from "../components/ui/label";
 import { useToast } from "../hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { usei18n } from "@/contexts/I18nContext";
-import { Language } from "@/lib/i18n";
-
-const detectSystemLanguage = (): Language => {
-  if (typeof navigator === "undefined") return "en";
-  const candidates = navigator.languages ?? [navigator.language];
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    if (candidate.toLowerCase().startsWith("fr")) {
-      return "fr";
-    }
-  }
-  return "en";
-};
 
 export default function Login() {
   const [isSignup, setIsSignup] = useState(false);
@@ -37,31 +24,7 @@ export default function Login() {
   const { toast } = useToast();
   const { language } = usei18n();
   const { user, loading: authLoading } = useAuth();
-  const [systemLanguage, setSystemLanguage] = useState<Language>(() => {
-    if (typeof navigator === "undefined") {
-      return language;
-    }
-
-    return detectSystemLanguage();
-  });
-  const [useSystemLanguage, setUseSystemLanguage] = useState(() => {
-    if (typeof window === "undefined") {
-      return true;
-    }
-    return localStorage.getItem("language") === null;
-  });
-
-  useEffect(() => {
-    if (typeof navigator !== "undefined") {
-      setSystemLanguage(detectSystemLanguage());
-    }
-
-    if (typeof window !== "undefined") {
-      setUseSystemLanguage(localStorage.getItem("language") === null);
-    }
-  }, []);
-
-  const displayLanguage = useSystemLanguage ? systemLanguage : language;
+  const displayLanguage = language;
   const title = displayLanguage === "en" ? "Inventory Vault" : "La Réserve";
   const tagline =
     displayLanguage === "en" ? "Manage your bar with style" : "Gérez votre bar avec style";
@@ -184,8 +147,8 @@ export default function Login() {
         <div className="flex flex-col items-center gap-8">
           <img src="/tonneau.png" alt="Logo tonneau" className="h-64 w-auto" />
           <div className="text-center">
-            <h1 className="text-5xl font-bold text-gray-900 mb-2">La Réserve</h1>
-            <p className="text-xl text-amber-700">Gérez votre bar avec style</p>
+            <h1 className="text-5xl font-bold text-gray-900 mb-2">{title}</h1>
+            <p className="text-xl text-amber-700">{tagline}</p>
           </div>
         </div>
       </div>
@@ -198,8 +161,8 @@ export default function Login() {
               <img src="/tonneau.png" alt="Logo" className="h-20 w-auto" />
             </div>
             <div className="lg:hidden text-center mb-4">
-              <h1 className="text-3xl font-bold text-gray-900">La Réserve</h1>
-              <p className="text-sm text-amber-700">Gérez votre bar avec style</p>
+              <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
+              <p className="text-sm text-amber-700">{tagline}</p>
             </div>
           </CardHeader>
         <CardContent className="space-y-4">

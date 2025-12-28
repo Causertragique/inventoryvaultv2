@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { Language, getTranslations, Translations } from "@/lib/i18n";
 
 interface i18nContextType {
@@ -17,23 +17,54 @@ const isSupportedClientLanguage = (lang: string | null | undefined): lang is Cli
   return supportedClientLanguages.includes(lang as ClientLanguage);
 };
 
+const detectSystemLanguage = (): Language => {
+  if (typeof navigator === "undefined") {
+    return "en";
+  }
+
+  const browserLang = navigator.language?.toLowerCase() ?? "en";
+  if (browserLang.startsWith("fr")) return "fr";
+
+  return "en";
+};
+
+const getSavedLanguage = (): Language | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const saved = window.localStorage.getItem("language");
+  return isSupportedClientLanguage(saved) ? (saved as Language) : null;
+};
+
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
-    const saved = localStorage.getItem("language");
-    if (isSupportedClientLanguage(saved)) {
-      return saved as Language;
+    return getSavedLanguage() ?? detectSystemLanguage();
+  });
+  const [useSystemLanguage, setUseSystemLanguage] = useState(() => !Boolean(getSavedLanguage()));
+
+  useEffect(() => {
+    if (!useSystemLanguage || typeof window === "undefined") {
+      return;
     }
 
-    const browserLang = navigator.language.toLowerCase();
-    if (browserLang.startsWith("fr")) return "fr";
+    const updateLanguage = () => {
+      setLanguageState(detectSystemLanguage());
+    };
 
-    return "en";
-  });
+    updateLanguage();
+    const handleChange = () => updateLanguage();
+    window.addEventListener("languagechange", handleChange);
+
+    return () => window.removeEventListener("languagechange", handleChange);
+  }, [useSystemLanguage]);
 
   const setLanguage = (lang: Language) => {
     const nextLanguage = isSupportedClientLanguage(lang) ? lang : "en";
     setLanguageState(nextLanguage);
-    localStorage.setItem("language", nextLanguage);
+    setUseSystemLanguage(false);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("language", nextLanguage);
+    }
   };
 
   const t = getTranslations(language);
